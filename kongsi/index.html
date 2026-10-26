@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Kongsi</title>
+    <meta name="theme-color" content="#4F46E5">
+    <meta name="description" content="Kongsi: track shared expenses, see who owes whom, record repayments.">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Kongsi">
+    <meta name="format-detection" content="telephone=no">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div id="app" class="app">
+        <main id="view" class="view" aria-live="polite"></main>
+        <nav id="tabbar" class="tabbar" aria-label="Main"></nav>
+        <div id="overlay" class="overlay"></div>
+        <div id="toast" class="toast" role="status"></div>
+    </div>
+    <noscript>Kongsi needs JavaScript to run.</noscript>
+    <script src="app.js"></script>
+</body>
+
+</html>
