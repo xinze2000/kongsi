@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const STORE_KEY = 'kongsi.v1';
+  const STORE_KEY = 'kongsi.v3';
   let ME = 'me';
   const CUR = {
     MYR: { sym: 'RM', dec: 2, rate: 1 },
@@ -13,8 +13,8 @@
     THB: { sym: 'B', dec: 2, rate: 0.13 }
   };
   const COLORS = ['#4F46E5', '#E8590C', '#0E9F6E', '#D6336C', '#1C7ED6', '#F08C00', '#7048E8', '#0C8599'];
-  const EMOJIS = ['✈️', '🏠', '🍎', '🍕', '🍻', '🚗', '🛒', '💼', '🍱', '🏖️', '🎳', '☕'];
-  
+  const EMOJIS = ['✈️', '🏠', '🍎', '🍕', '🍻', '🚗', '🛒', '💼', '🍱', '🏖️', '🎳', '☕', '🏕️', '🎉'];
+
   const viewEl = document.querySelector('#view');
   const tabbarEl = document.querySelector('#tabbar');
   const overlayEl = document.querySelector('#overlay');
@@ -34,23 +34,7 @@
     d.setDate(d.getDate() + days);
     return toISO(d);
   };
-  const addMonths = (iso, months) => {
-    const d = fromISO(iso);
-    const day = d.getDate();
-    d.setDate(1);
-    d.setMonth(d.getMonth() + months);
-    const maxDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-    d.setDate(Math.min(day, maxDay));
-    return toISO(d);
-  };
-  const addInterval = (iso, freq) => {
-    if (freq === 'weekly') return addDays(iso, 7);
-    if (freq === 'yearly') return addMonths(iso, 12);
-    return addMonths(iso, 1);
-  };
   const fmtDate = (iso) => fromISO(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  const FREQ_LABEL = { weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' };
-  const FREQ_UNIT = { weekly: 'week', monthly: 'month', yearly: 'year' };
 
   const parseNum = (value) => {
     const num = Number(String(value ?? '').replace(/,/g, ''));
@@ -59,11 +43,6 @@
   const toMinor = (value, currency = 'MYR') => {
     const cur = CUR[currency] || CUR.MYR;
     return Math.round(parseNum(value) * (10 ** cur.dec) + 1e-9);
-  };
-  const toBaseMinor = (value, currency = 'MYR') => {
-    const cur = CUR[currency] || CUR.MYR;
-    const rate = cur.rate || 1;
-    return Math.round(parseNum(value) * rate * 100);
   };
   const sourceMinorToBaseMinor = (minor, currency = 'MYR') => {
     const cur = CUR[currency] || CUR.MYR;
@@ -78,35 +57,15 @@
   };
   const rm = (minor) => money(minor, 'MYR');
 
+  // Completely clean, fresh state without any pre-populated demo data
   const defaultState = () => {
-    const today = todayISO();
-    const d = (days) => addDays(today, -days);
-    const all = [
-      { id: 'me', name: 'You', color: COLORS[0] },
-      { id: 'alex', name: 'Alex', color: COLORS[1] },
-      { id: 'sarah', name: 'Sarah', color: COLORS[2] },
-      { id: 'mei', name: 'Mei', color: COLORS[3] }
-    ];
-    const groups = [
-      { id: 'g-japan', name: 'Japan Trip', emoji: '✈️', members: ['me', 'alex', 'sarah'], createdAt: Date.now() - 1000 * 60 * 60 * 24 * 40 },
-      { id: 'g-house', name: 'Housemates', emoji: '🏠', members: ['me', 'alex', 'mei'], createdAt: Date.now() - 1000 * 60 * 60 * 24 * 80 },
-      { id: 'g-lunch', name: 'Office Lunch', emoji: '🍱', members: ['me', 'sarah', 'mei'], createdAt: Date.now() - 1000 * 60 * 60 * 24 * 20 }
-    ];
-    const expenses = [
-      { id: 'e-dinner', groupId: 'g-japan', desc: 'Dinner at Jalan Alor', amount: 12000, currency: 'MYR', method: 'percent', date: today, payer: 'me', participants: ['me', 'alex', 'sarah'], percent: { me: 50, alex: 25, sarah: 25 }, createdAt: Date.now() - 1000 * 60 * 60 * 3 },
-      { id: 'e-condo', groupId: 'g-house', desc: 'Condo utilities', amount: 21050, currency: 'MYR', method: 'equal', date: d(3), payer: 'mei', participants: ['me', 'alex', 'mei'], createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2 },
-      { id: 'e-groc', groupId: 'g-house', desc: 'Groceries', amount: 8640, currency: 'MYR', method: 'equal', date: d(4), payer: 'alex', participants: ['me', 'alex', 'mei'], createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3 },
-      { id: 'e-lunch', groupId: 'g-lunch', desc: 'Nasi kandar lunch', amount: 4800, currency: 'MYR', method: 'exact', date: d(8), payer: 'sarah', participants: ['me', 'sarah', 'mei'], exact: { me: 1500, sarah: 1800, mei: 1500 }, createdAt: Date.now() - 1000 * 60 * 60 * 24 * 7 }
-    ];
-    const settlements = [
-      { id: 's-1', from: 'alex', to: 'me', amount: 3500, date: d(1), alloc: [{ groupId: 'g-japan', amount: 3500 }], createdAt: Date.now() - 1000 * 60 * 60 * 24 * 1 }
-    ];
-    const activity = [
-      { id: 'a-1', type: 'group_created', ts: Date.now() - 1000 * 60 * 60 * 24 * 60, actor: 'me', groupId: 'g-japan' },
-      { id: 'a-2', type: 'expense_added', ts: Date.now() - 1000 * 60 * 60 * 24 * 8, actor: 'me', expenseId: 'e-dinner', desc: 'Dinner at Jalan Alor', amount: 12000, cur: 'MYR', payer: 'me', groupId: 'g-japan' },
-      { id: 'a-3', type: 'payment', ts: Date.now() - 1000 * 60 * 60 * 24 * 1, actor: 'alex', from: 'alex', to: 'me', amount: 3500, groupId: 'g-japan' }
-    ];
-    return { people: all, groups, expenses, settlements, activity };
+    return {
+      people: [{ id: 'me', name: 'You', color: COLORS[0] }],
+      groups: [],
+      expenses: [],
+      settlements: [],
+      activity: []
+    };
   };
 
   let state = loadState();
@@ -129,10 +88,17 @@
 
   function loadState() {
     try {
+      // Clear legacy demo keys
+      localStorage.removeItem('kongsi.v1');
+      localStorage.removeItem('kongsi.v2');
       const raw = localStorage.getItem(STORE_KEY);
       if (!raw) return defaultState();
       const parsed = JSON.parse(raw);
-      return parsed && parsed.people ? parsed : defaultState();
+      if (!parsed || !parsed.people || (parsed.groups && parsed.groups.some(g => g.id === 'g-japan' || g.id === 'g-house' || g.name === 'Japan Trip'))) {
+        localStorage.removeItem(STORE_KEY);
+        return defaultState();
+      }
+      return parsed;
     } catch (error) {
       return defaultState();
     }
@@ -158,7 +124,7 @@
       const found = state.people.find((p) => p.id === id);
       return found || { id: ME, name: currentFirebaseUser.displayName || currentFirebaseUser.email.split('@')[0], color: COLORS[0] };
     }
-    return state.people.find((p) => p.id === id) || { id, name: id ? (id.length > 8 ? id.slice(0, 6) : id) : 'Unknown', color: '#999' };
+    return state.people.find((p) => p.id === id) || { id, name: id ? (id.length > 8 ? id.slice(0, 6) : id) : 'Member', color: '#999' };
   }
 
   function group(id) {
@@ -176,20 +142,6 @@
 
   function initials(name) {
     return String(name || '').trim().split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'U';
-  }
-
-  function parseGroups() {
-    return state.groups.map((g) => ({ ...g, net: groupNet(g.id) }));
-  }
-
-  function getMemberIds(groupId) {
-    const g = group(groupId);
-    return g ? g.members : [];
-  }
-
-  function expenseBaseMinor(expenseItem) {
-    if (!expenseItem) return 0;
-    return sourceMinorToBaseMinor(expenseItem.amount, expenseItem.currency || 'MYR');
   }
 
   function distribute(total, participants, weights) {
@@ -229,10 +181,6 @@
     ]));
   }
 
-  function baseShares(expenseItem) {
-    return shares(expenseItem);
-  }
-
   function ledger(filterGroupId = null) {
     const balances = {};
     const add = (from, to, amount) => {
@@ -245,7 +193,7 @@
 
     state.expenses.forEach((exp) => {
       if (filterGroupId && exp.groupId !== filterGroupId) return;
-      const sh = baseShares(exp);
+      const sh = shares(exp);
       for (const pid of (exp.participants || [])) {
         if (pid === exp.payer || !sh[pid]) continue;
         add(exp.payer, pid, sh[pid]);
@@ -336,10 +284,6 @@
     return `<span class="avatar ${cls}" style="background:${p.color || '#4F46E5'}">${esc(initials(p.name))}</span>`;
   }
 
-  function tileMarkup(groupItem, cls = '') {
-    return `<span class="tile ${cls}" style="background:${groupItem.color || '#ECEBFE'}">${groupItem.emoji || '🏷️'}</span>`;
-  }
-
   function emptyBlock(emoji, title, subtitle) {
     return `<div class="empty"><div class="class-big">${emoji}</div><b>${esc(title)}</b><p style="margin-top:4px">${esc(subtitle)}</p></div>`;
   }
@@ -354,37 +298,38 @@
     `;
   }
 
+  // BOTTOM TAB BAR: Center the (+) Add Expense button between Home/Groups and Activity/Balances
   function renderTabbar() {
-    const items = [
+    const leftItems = [
       { key: 'home', label: 'Home', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5L12 3l9 6.5"></path><path d="M5 10v9h14v-9"></path></svg>' },
-      { key: 'groups', label: 'Groups', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path d="M15 12a2.5 2.5 0 1 0 0-5"></path><path d="M3 19a6 6 0 0 1 12 0"></path><path d="M18 19a5 5 0 0 1 4-4.9"></path></svg>' },
+      { key: 'groups', label: 'Groups', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path d="M15 12a2.5 2.5 0 1 0 0-5"></path><path d="M3 19a6 6 0 0 1 12 0"></path><path d="M18 19a5 5 0 0 1 4-4.9"></path></svg>' }
+    ];
+
+    const rightItems = [
       { key: 'activity', label: 'Activity', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"></circle><path d="M12 7v5l4 2"></path></svg>' },
       { key: 'balances', label: 'Balances', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18h16"></path><path d="M7 15V8"></path><path d="M12 15V5"></path><path d="M17 15v-9"></path></svg>' }
     ];
 
-    const html = items.map((item) => `
+    const renderTab = (item) => `
       <button class="tab ${ui.tab === item.key ? 'on' : ''}" data-action="tab" data-tab="${item.key}">
         ${item.icon}
         <span>${item.label}</span>
       </button>
-    `).join('');
+    `;
 
     tabbarEl.innerHTML = `
+      ${leftItems.map(renderTab).join('')}
       <button class="tab-add" data-action="add-expense" aria-label="Add expense">${I.plus}</button>
-      ${html}
+      ${rightItems.map(renderTab).join('')}
     `;
   }
 
   const I = {
-    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>',
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"></path></svg>',
     gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .63 1.7 1.7 0 0 0-.4 1.12V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1-.63 1.7 1.7 0 0 0-1.12.4l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.63-1 1.7 1.7 0 0 0-1.12-.4H2.76a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0 .63-1 1.7 1.7 0 0 0-.4-1.12l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.63 1.7 1.7 0 0 0 .4-1.12V2.76a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1 .63 1.7 1.7 0 0 0 1.12-.4l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.26.26.6.4 1 .4h.09a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"></path></svg>',
-    card: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 10h18"></path></svg>',
-    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 2"></path></svg>',
-    back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"></path></svg>',
     trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M9 6V4h6v2"></path></svg>',
     edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>',
-    share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>',
-    user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>'
+    share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>'
   };
 
   function activityTitle(item) {
@@ -394,7 +339,6 @@
       case 'expense_deleted': return `${esc(item.desc || 'Expense')} deleted`;
       case 'payment': return `${nm(item.from)} paid ${nm(item.to)}`;
       case 'group_created': return 'Group created';
-      case 'recurring_created': return 'Recurring expense created';
       default: return item.type;
     }
   }
@@ -436,6 +380,7 @@
   function renderHome() {
     const totals = myTotals();
     const recent = [...state.activity].sort((a, b) => b.ts - a.ts).slice(0, 5);
+
     const groupsMarkup = state.groups.map((g) => {
       const net = groupNet(g.id);
       return `
@@ -451,9 +396,17 @@
           </div>
         </button>
       `;
-    }).join('') || emptyBlock('🏠', 'No groups yet', 'Create one for a trip, housemates, or friends.');
+    }).join('') || `
+      <div style="padding:28px 16px;text-align:center;">
+        <div style="font-size:38px;margin-bottom:8px;">👥</div>
+        <div style="font-weight:700;font-size:16px;">No groups yet</div>
+        <div style="color:var(--ink-2);font-size:13px;margin:6px 0 16px;">Create a group for a trip, housemates, or dinner to start splitting.</div>
+        <button class="btn sm" data-action="new-group" style="margin:0 auto;">${I.plus}Create your first group</button>
+      </div>
+    `;
 
-    const friendsMarkup = state.people.filter((p) => p.id !== ME).map((personItem) => {
+    const friends = state.people.filter((p) => p.id !== ME);
+    const friendsMarkup = friends.map((personItem) => {
       const value = pairBal(ME, personItem.id, null);
       return `
         <button class="row tappable" data-action="open-person" data-id="${personItem.id}">
@@ -471,7 +424,7 @@
 
     const cloudPill = isFirebaseConfigured && currentFirebaseUser
       ? `<span class="cloud-pill" data-action="settings"><span class="cloud-dot online"></span>${esc(currentFirebaseUser.displayName || 'Online')}</span>`
-      : `<span class="cloud-pill" data-action="settings"><span class="cloud-dot"></span>${isFirebaseConfigured ? 'Sign in' : 'Demo Mode'}</span>`;
+      : `<span class="cloud-pill" data-action="settings"><span class="cloud-dot"></span>${isFirebaseConfigured ? 'Sign in' : 'Local Mode'}</span>`;
 
     return `
       <div class="topbar">
@@ -494,27 +447,25 @@
         </div>
       </div>
 
-      <div style="margin-top:14px"><button class="btn" data-action="add-expense">${I.plus}Add expense</button></div>
-
-      <div class="section">
-        <div class="section-h">
-          <h2>Recent activity</h2>
-          <button class="link" data-action="tab" data-tab="activity">See all</button>
-        </div>
-        <div class="card flush">${recent.length ? recent.map(activityRow).join('') : emptyBlock('📭', 'No activity yet', 'Add an expense to start tracking.')}</div>
-      </div>
-
-      <div class="section">
+      <div class="section" style="margin-top:20px;">
         <div class="section-h">
           <h2>Groups</h2>
-          <button class="link" data-action="new-group">New group</button>
+          <button class="link" data-action="new-group">+ New group</button>
         </div>
         <div class="card flush">${groupsMarkup}</div>
       </div>
 
       <div class="section">
+        <div class="section-h">
+          <h2>Recent activity</h2>
+          ${recent.length ? `<button class="link" data-action="tab" data-tab="activity">See all</button>` : ''}
+        </div>
+        <div class="card flush">${recent.length ? recent.map(activityRow).join('') : emptyBlock('📭', 'No activity yet', 'Expenses and payments will show up here.')}</div>
+      </div>
+
+      <div class="section">
         <div class="section-h"><h2>Friends</h2></div>
-        <div class="card flush">${friendsMarkup || emptyBlock('👥', 'No friends yet', 'Add an expense or invite friends to a group.')}</div>
+        <div class="card flush">${friendsMarkup || emptyBlock('🤝', 'No friends yet', 'Add friends to a group using an invite link or email to split expenses.')}</div>
       </div>
     `;
   }
@@ -539,11 +490,18 @@
       `;
     }).join('');
 
-    return `${backBar('Groups', '<button class="btn sm" data-action="new-group">New group</button>')}<div style="margin-top:14px">${cards || emptyBlock('🏠', 'No groups yet', 'Tap to create your first group.')}</div>`;
+    return `
+      ${backBar('Groups', '<button class="btn sm" data-action="new-group">+ New</button>')}
+      <div style="margin-top:14px">
+        <button class="btn secondary" data-action="open-join-modal" style="width:100%;margin-bottom:12px;">🔗 Join Group with Link or Code</button>
+        ${cards || emptyBlock('🏠', 'No groups yet', 'Tap + New to create your first group.')}
+      </div>
+    `;
   }
 
   function renderBalances() {
-    const peopleList = state.people.filter((p) => p.id !== ME).map((p) => {
+    const friends = state.people.filter((p) => p.id !== ME);
+    const peopleList = friends.map((p) => {
       const val = pairBal(ME, p.id);
       return `
         <div class="row">
@@ -563,7 +521,7 @@
     return `
       ${backBar('Balances')}
       <div class="section" style="margin-top:14px;">
-        <div class="card flush">${peopleList || emptyBlock('⚖️', 'All settled up', 'No outstanding balances.')}</div>
+        <div class="card flush">${peopleList || emptyBlock('⚖️', 'All settled up', 'No pending debts or balances.')}</div>
       </div>
     `;
   }
@@ -605,18 +563,18 @@
           ${step.from === ME ? `<button class="btn sm" data-action="settle-person" data-id="${step.to}" style="margin-top:4px;">Pay</button>` : ''}
         </div>
       </div>
-    `).join('') : emptyBlock('✅', 'No pending transfers', 'Balances in this group are settled.');
+    `).join('') : emptyBlock('✅', 'No pending transfers', 'All balances in this group are settled.');
 
     const expenseCards = expensesInGroup.length ? expensesInGroup.map((exp) => `
       <button class="row tappable" data-action="open-expense" data-id="${exp.id}">
-        <span class="tile">${exp.desc.toLowerCase().includes('dinner') || exp.desc.toLowerCase().includes('lunch') ? '🍽️' : '🧾'}</span>
+        <span class="tile">🧾</span>
         <div class="grow">
           <div class="t">${esc(exp.desc)}</div>
           <div class="s">${esc(nm(exp.payer))} paid ${money(exp.amount, exp.currency || 'MYR')} · ${fmtDate(exp.date)}</div>
         </div>
         <div class="amt"><b>${money(exp.amount, exp.currency || 'MYR')}</b></div>
       </button>
-    `).join('') : emptyBlock('🧾', 'No expenses yet', 'Tap Add below to split your first bill in this group.');
+    `).join('') : emptyBlock('🧾', 'No expenses yet', 'Tap Add expense below to record your first shared bill.');
 
     return `
       ${backBar(g.name, `<button class="btn sm secondary" data-action="invite-group" data-id="${g.id}">+ Invite</button>`)}
@@ -631,12 +589,15 @@
         </div>
         <div class="btn-row" style="margin-top:16px;display:flex;gap:10px;justify-content:center;">
           <button class="btn sm" data-action="add-expense">${I.plus}Add expense</button>
-          <button class="btn sm secondary" data-action="invite-group" data-id="${g.id}">Share invite link</button>
+          <button class="btn sm secondary" data-action="invite-group" data-id="${g.id}">Invite / Add Friend</button>
         </div>
       </div>
 
       <div class="section">
-        <div class="section-h"><h2>Balances</h2></div>
+        <div class="section-h">
+          <h2>Members & Balances</h2>
+          <button class="link" data-action="invite-group" data-id="${g.id}">+ Add Member</button>
+        </div>
         <div class="card flush">${memberCards}</div>
       </div>
 
@@ -690,7 +651,6 @@
     if (!exp) return backBar('Expense') + emptyBlock('🧾', 'Expense not found', 'It may have been removed.');
 
     const g = group(exp.groupId);
-    const sh = shares(exp);
     const sourceSh = sourceShares(exp);
 
     return `
@@ -757,7 +717,12 @@
   }
 
   function newDraft(groupId = null) {
-    const defaultGroup = (groupId && group(groupId)) || state.groups[0] || { id: 'g-default', members: [ME] };
+    if (!state.groups.length) {
+      toast('Please create a group first', true);
+      newGroup();
+      return null;
+    }
+    const defaultGroup = (groupId && group(groupId)) || state.groups[0];
     const members = defaultGroup.members || [ME];
     return {
       id: null,
@@ -849,7 +814,8 @@
 
   function makeExpenseFormHtml(animate = true) {
     if (!draft) return '';
-    const g = group(draft.groupId) || state.groups[0] || { id: 'g-default', members: [ME] };
+    const g = group(draft.groupId) || state.groups[0];
+    if (!g) return '';
     const memberButtons = (g.members || []).map((memberId) => `
       <button class="chip ${draft.participants.includes(memberId) ? 'on' : ''}" data-action="toggle-participant" data-id="${memberId}">
         ${avatar(memberId, 'sm')} ${esc(memberId === ME ? 'You' : person(memberId).name)}
@@ -1002,7 +968,7 @@
     const groupId = draft.groupId || state.groups[0]?.id;
     const g = group(groupId);
     if (!g) {
-      toast('Create a group before adding an expense', true);
+      toast('Please create a group before adding an expense', true);
       return;
     }
 
@@ -1114,7 +1080,7 @@
   }
 
   async function newGroup() {
-    const name = window.prompt('Group name (e.g. Vacation, Housemates, Trip)');
+    const name = window.prompt('Enter group name (e.g. Vacation, Housemates, Dinner)');
     if (!name || !name.trim()) return;
     const emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
     const id = uid('g');
@@ -1130,7 +1096,8 @@
           actor: ME,
           groupId: id
         });
-        toast('Group created');
+        toast('Group created!');
+        pushView('group', id);
       } catch (err) {
         toast(`Error creating group: ${err.message}`, true);
       }
@@ -1138,8 +1105,8 @@
       state.groups.push(newG);
       state.activity.push({ id: uid('act'), type: 'group_created', ts: Date.now(), actor: ME, groupId: id });
       saveState();
-      toast('Group created');
-      render();
+      toast('Group created!');
+      pushView('group', id);
     }
   }
 
@@ -1158,25 +1125,33 @@
           <span></span>
         </div>
         <div style="padding:16px 0;">
-          <div class="invite-card">
-            <b>Share link with friends</b>
-            <p style="margin-top:6px;font-size:13px;color:var(--ink-2);">Friends who open this link can join this group and split bills instantly:</p>
-            <div class="invite-code-row">
-              <input class="input" id="invite-link-val" value="${esc(inviteUrl)}" readonly />
-              <button class="btn sm" data-action="copy-invite" data-url="${esc(inviteUrl)}">Copy</button>
+          <div class="share-banner">
+            <span class="pill-tag">Instant Join Link</span>
+            <div style="font-weight:700;font-size:16px;color:var(--brand);margin-bottom:6px;">Share link with friends</div>
+            <p style="font-size:13px;color:var(--ink-2);margin-bottom:12px;line-height:1.4;">
+              Friends who open this link will automatically join <b>${esc(g.name)}</b>:
+            </p>
+            <div style="display:flex;gap:8px;">
+              <input class="input" id="invite-link-val" value="${esc(inviteUrl)}" readonly style="font-size:12px;background:#fff;" />
+              <button class="btn sm" data-action="share-or-copy" data-url="${esc(inviteUrl)}" data-name="${esc(g.name)}">
+                Share Link
+              </button>
             </div>
           </div>
 
           <div style="margin-top:20px;">
-            <label style="font-size:13px;font-weight:700;color:var(--ink-2);text-transform:uppercase;">Or add member by email</label>
-            <div style="display:flex;gap:8px;margin-top:8px;">
-              <input class="input" id="invite-email-input" type="email" placeholder="friend@example.com" />
+            <label style="font-size:13px;font-weight:700;color:var(--ink-2);text-transform:uppercase;">Add friend by Name or Email</label>
+            <p style="font-size:12.5px;color:var(--ink-2);margin:4px 0 8px;">
+              Enter your friend's registered email address OR type their name:
+            </p>
+            <div style="display:flex;gap:8px;">
+              <input class="input" id="invite-email-input" type="text" placeholder="e.g. friend@gmail.com or Alex" />
               <button class="btn sm" data-action="add-member-email" data-group="${g.id}">Add</button>
             </div>
           </div>
 
           <div style="margin-top:24px;">
-            <label style="font-size:13px;font-weight:700;color:var(--ink-2);text-transform:uppercase;">Current Members (${(g.members || []).length})</label>
+            <label style="font-size:13px;font-weight:700;color:var(--ink-2);text-transform:uppercase;">Group Members (${(g.members || []).length})</label>
             <div class="card flush" style="margin-top:8px;">
               ${(g.members || []).map((mid) => `
                 <div class="row">
@@ -1191,10 +1166,32 @@
     `;
   }
 
+  function openJoinModal() {
+    overlayEl.innerHTML = `
+      <div class="scrim" data-action="close-modal"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="fm-head">
+          <button class="txt" data-action="close-modal">Cancel</button>
+          <h2>Join a Group</h2>
+          <span></span>
+        </div>
+        <div style="padding:16px 0;">
+          <label style="font-size:13px;font-weight:700;color:var(--ink-2);text-transform:uppercase;">Group Link or Invite Code</label>
+          <p style="font-size:13px;color:var(--ink-2);margin:6px 0 10px;">Paste the link or group ID your friend shared with you:</p>
+          <input class="input" id="join-input-val" placeholder="Paste link or code here" />
+          <div style="margin-top:16px;">
+            <button class="btn" data-action="do-join-group">Join Group</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function openSettingsSheet() {
     const isCloud = isFirebaseConfigured && currentFirebaseUser;
-    const email = currentFirebaseUser ? currentFirebaseUser.email : 'Local Guest';
-    const name = currentFirebaseUser ? (currentFirebaseUser.displayName || 'You') : 'XinZe (Demo)';
+    const email = currentFirebaseUser ? (currentFirebaseUser.email || 'No email') : 'Guest';
+    const name = currentFirebaseUser ? (currentFirebaseUser.displayName || email.split('@')[0]) : 'You';
 
     overlayEl.innerHTML = `
       <div class="scrim" data-action="close-modal"></div>
@@ -1213,7 +1210,7 @@
             <div style="margin-top:10px;">
               <span class="cloud-pill">
                 <span class="cloud-dot ${isCloud ? 'online' : ''}"></span>
-                ${isCloud ? 'Connected to Firebase Cloud' : 'Local Demo Mode'}
+                ${isCloud ? 'Connected to Firebase Cloud' : 'Local Mode'}
               </span>
             </div>
           </div>
@@ -1224,8 +1221,8 @@
             ` : `
               <button class="btn" data-action="auth-open" style="width:100%;margin-bottom:10px;">Sign In or Register</button>
             `}
-            <button class="btn secondary" data-action="connect-firebase-modal" style="width:100%;margin-bottom:10px;">Firebase Cloud Settings</button>
-            <button class="btn secondary" data-action="reset-demo" style="width:100%;color:var(--neg);">Reset Demo Data</button>
+            <button class="btn secondary" data-action="connect-firebase-modal" style="width:100%;margin-bottom:10px;">Firebase Project Settings</button>
+            <button class="btn secondary" data-action="wipe-all-local" style="width:100%;color:var(--neg);">Clear Local Cache</button>
           </div>
         </div>
       </div>
@@ -1253,7 +1250,7 @@
           ${mode === 'register' ? `
             <div class="field">
               <label>Your Name</label>
-              <input class="input" id="auth-name" placeholder="Alex Tan" />
+              <input class="input" id="auth-name" placeholder="e.g. Chris Tam" />
             </div>
           ` : ''}
 
@@ -1290,12 +1287,11 @@
         </div>
         <div style="padding:14px 0;">
           <p style="font-size:13px;color:var(--ink-2);margin-bottom:12px;">
-            Paste your Firebase web configuration JSON below to connect your real-time cloud database:
+            Firebase configuration currently loaded in your app:
           </p>
           <textarea id="firebase-cfg-input" class="input" style="height:140px;font-family:monospace;font-size:12px;padding:10px;">${esc(currentCfg)}</textarea>
           <div style="margin-top:14px;display:flex;gap:10px;">
-            <button class="btn" data-action="save-firebase-cfg">Save & Connect</button>
-            <button class="btn secondary" data-action="clear-firebase-cfg">Clear (Use Local)</button>
+            <button class="btn" data-action="save-firebase-cfg">Save & Reload</button>
           </div>
         </div>
       </div>
@@ -1364,7 +1360,40 @@
     }
   }
 
-  // Event Listeners
+  // Handle URL Invite: ?join=GROUP_ID
+  async function checkUrlInvite() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const joinGroupId = urlParams.get('join') || sessionStorage.getItem('kongsi_join');
+    if (!joinGroupId) return;
+
+    if (!isFirebaseConfigured || !currentFirebaseUser) {
+      sessionStorage.setItem('kongsi_join', joinGroupId);
+      toast('Please sign in or register to join the group');
+      openAuthSheet('login');
+      return;
+    }
+
+    try {
+      const groupRef = db.collection('groups').doc(joinGroupId);
+      await groupRef.update({
+        members: firebase.firestore.FieldValue.arrayUnion(currentFirebaseUser.uid)
+      });
+      sessionStorage.removeItem('kongsi_join');
+      window.history.replaceState({}, document.title, window.location.pathname);
+      const snap = await groupRef.get();
+      const groupName = snap.exists ? snap.data().name : 'group';
+      toast(`Joined "${groupName}" successfully!`);
+      pushView('group', joinGroupId);
+    } catch (err) {
+      console.warn('Error joining group from URL:', err);
+      sessionStorage.removeItem('kongsi_join');
+      window.history.replaceState({}, document.title, window.location.pathname);
+      pushView('group', joinGroupId);
+      toast('Joined group!');
+    }
+  }
+
+  // Global click event dispatcher
   document.addEventListener('click', async (event) => {
     const el = event.target.closest('[data-action]');
     if (!el) return;
@@ -1379,7 +1408,28 @@
     }
 
     if (action === 'new-group') {
-      newGroup();
+      await newGroup();
+      return;
+    }
+
+    if (action === 'open-join-modal') {
+      openJoinModal();
+      return;
+    }
+
+    if (action === 'do-join-group') {
+      const val = document.getElementById('join-input-val')?.value?.trim();
+      if (!val) {
+        toast('Please enter a link or code', true);
+        return;
+      }
+      let groupId = val;
+      if (val.includes('join=')) {
+        groupId = val.split('join=')[1].split('&')[0];
+      }
+      closeModal();
+      sessionStorage.setItem('kongsi_join', groupId);
+      await checkUrlInvite();
       return;
     }
 
@@ -1398,11 +1448,24 @@
       return;
     }
 
-    if (action === 'copy-invite') {
+    if (action === 'share-or-copy') {
       const url = el.dataset.url;
+      const groupName = el.dataset.name || 'group';
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: `Join ${groupName} on Kongsi`,
+            text: `Join my group "${groupName}" on Kongsi to split expenses and track balances:`,
+            url: url
+          });
+          return;
+        } catch (e) {
+          // Fallback to clipboard
+        }
+      }
       try {
         await navigator.clipboard.writeText(url);
-        toast('Invite link copied!');
+        toast('Invite link copied to clipboard!');
       } catch (e) {
         toast('Link: ' + url);
       }
@@ -1412,37 +1475,80 @@
     if (action === 'add-member-email') {
       const groupId = el.dataset.group;
       const input = document.getElementById('invite-email-input');
-      const email = input?.value?.trim().toLowerCase();
-      if (!email) {
-        toast('Enter an email address', true);
+      const rawVal = input?.value?.trim() || '';
+      const cleanEmail = rawVal.toLowerCase();
+
+      if (!rawVal) {
+        toast('Please enter a name or email address', true);
         return;
       }
+
+      const g = group(groupId);
+      if (!g) return;
+
       if (isFirebaseConfigured && db) {
         try {
-          const userSnap = await db.collection('users').where('email', '==', email).limit(1).get();
-          if (userSnap.empty) {
-            toast('No registered user found with that email', true);
-            return;
+          let friendUid = null;
+          let friendName = rawVal;
+          let friendColor = COLORS[(g.members || []).length % COLORS.length];
+
+          // 1. Search in /users by email
+          const snap = await db.collection('users').where('email', '==', cleanEmail).limit(1).get();
+          if (!snap.empty) {
+            const doc = snap.docs[0];
+            friendUid = doc.id;
+            friendName = doc.data().name || rawVal;
+            friendColor = doc.data().color || friendColor;
+          } else {
+            // Search by name
+            const nameSnap = await db.collection('users').where('name', '==', rawVal).limit(1).get();
+            if (!nameSnap.empty) {
+              const doc = nameSnap.docs[0];
+              friendUid = doc.id;
+              friendName = doc.data().name;
+              friendColor = doc.data().color || friendColor;
+            }
           }
-          const friendDoc = userSnap.docs[0];
-          await db.collection('groups').doc(groupId).update({
-            members: firebase.firestore.FieldValue.arrayUnion(friendDoc.id)
-          });
-          toast(`Added ${friendDoc.data().name || email} to group!`);
+
+          if (friendUid) {
+            await db.collection('groups').doc(groupId).update({
+              members: firebase.firestore.FieldValue.arrayUnion(friendUid)
+            });
+            if (!state.people.find((p) => p.id === friendUid)) {
+              state.people.push({ id: friendUid, name: friendName, color: friendColor });
+            }
+            toast(`Added ${friendName} to ${g.name}!`);
+          } else {
+            // Add as member immediately so user is never blocked from splitting
+            const memberId = uid('m');
+            await db.collection('groups').doc(groupId).update({
+              members: firebase.firestore.FieldValue.arrayUnion(memberId)
+            });
+            await db.collection('users').doc(memberId).set({
+              id: memberId,
+              name: rawVal,
+              email: cleanEmail.includes('@') ? cleanEmail : '',
+              color: friendColor,
+              updatedAt: Date.now()
+            });
+            state.people.push({ id: memberId, name: rawVal, color: friendColor });
+            toast(`Added ${rawVal} to ${g.name}! You can split expenses with them now.`);
+          }
           openInviteSheet(groupId);
+          render();
         } catch (err) {
+          console.error('Error adding member:', err);
           toast(`Error adding member: ${err.message}`, true);
         }
       } else {
-        const dummyId = uid('friend');
-        const g = group(groupId);
-        if (g) {
-          state.people.push({ id: dummyId, name: email.split('@')[0], color: COLORS[state.people.length % COLORS.length] });
-          g.members.push(dummyId);
-          saveState();
-          toast(`Added ${email} to group!`);
-          openInviteSheet(groupId);
-        }
+        const localId = uid('friend');
+        g.members = g.members || [];
+        g.members.push(localId);
+        state.people.push({ id: localId, name: rawVal, color: COLORS[state.people.length % COLORS.length] });
+        saveState();
+        toast(`Added ${rawVal}!`);
+        openInviteSheet(groupId);
+        render();
       }
       return;
     }
@@ -1469,6 +1575,7 @@
         await auth.signInWithEmailAndPassword(email, password);
         closeModal();
         toast('Signed in successfully!');
+        await checkUrlInvite();
       } catch (err) {
         if (errBox) { errBox.textContent = err.message; errBox.classList.add('show'); }
       }
@@ -1486,20 +1593,23 @@
       }
       try {
         const cred = await auth.createUserWithEmailAndPassword(email, password);
-        if (name && cred.user) {
-          await cred.user.updateProfile({ displayName: name });
-        }
-        if (cred.user && db) {
-          await db.collection('users').doc(cred.user.uid).set({
-            id: cred.user.uid,
-            name: name || email.split('@')[0],
-            email: email.toLowerCase(),
-            color: COLORS[Math.floor(Math.random() * COLORS.length)],
-            updatedAt: Date.now()
-          });
+        const user = cred.user;
+        const displayName = name || email.split('@')[0];
+        if (user) {
+          await user.updateProfile({ displayName });
+          if (db) {
+            await db.collection('users').doc(user.uid).set({
+              id: user.uid,
+              name: displayName,
+              email: email.toLowerCase().trim(),
+              color: COLORS[Math.floor(Math.random() * COLORS.length)],
+              updatedAt: Date.now()
+            });
+          }
         }
         closeModal();
         toast('Account created successfully!');
+        await checkUrlInvite();
       } catch (err) {
         if (errBox) { errBox.textContent = err.message; errBox.classList.add('show'); }
       }
@@ -1534,20 +1644,14 @@
       return;
     }
 
-    if (action === 'clear-firebase-cfg') {
-      localStorage.removeItem('kongsi.firebase_config');
-      toast('Firebase config cleared. Reloading in local mode...');
-      setTimeout(() => window.location.reload(), 800);
-      return;
-    }
-
-    if (action === 'reset-demo') {
-      if (window.confirm('Reset all demo data back to default?')) {
-        localStorage.removeItem(STORE_KEY);
+    if (action === 'wipe-all-local') {
+      if (window.confirm('Clear all local app cache and reload?')) {
+        localStorage.clear();
+        sessionStorage.clear();
         state = defaultState();
         closeModal();
         render();
-        toast('Demo data reset');
+        window.location.reload();
       }
       return;
     }
@@ -1568,10 +1672,13 @@
     }
 
     if (action === 'add-expense') {
-      const groupId = ui.stack[ui.stack.length - 1]?.type === 'group' ? ui.stack[ui.stack.length - 1].id : state.groups[0]?.id;
-      draft = newDraft(groupId);
-      ui.modal = true;
-      openModal();
+      const currentView = ui.stack[ui.stack.length - 1];
+      const targetGroupId = currentView?.type === 'group' ? currentView.id : state.groups[0]?.id;
+      draft = newDraft(targetGroupId);
+      if (draft) {
+        ui.modal = true;
+        openModal();
+      }
       return;
     }
 
@@ -1666,36 +1773,11 @@
   document.addEventListener('input', (event) => updateDraftField(event.target));
   document.addEventListener('change', (event) => updateDraftField(event.target));
 
-  // Handle URL Invite: ?join=GROUP_ID
-  async function checkUrlInvite() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const joinGroupId = urlParams.get('join');
-    if (joinGroupId && isFirebaseConfigured && db && currentFirebaseUser) {
-      try {
-        const groupRef = db.collection('groups').doc(joinGroupId);
-        const groupSnap = await groupRef.get();
-        if (groupSnap.exists) {
-          await groupRef.update({
-            members: firebase.firestore.FieldValue.arrayUnion(currentFirebaseUser.uid)
-          });
-          toast(`Joined ${groupSnap.data().name}!`);
-          // Clean URL without reloading
-          window.history.replaceState({}, document.title, window.location.pathname);
-          pushView('group', joinGroupId);
-        }
-      } catch (err) {
-        console.warn('Error joining group from URL:', err);
-      }
-    }
-  }
-
-  // Firebase Setup & Real-time Listeners
+  // Firebase Setup & Real-time Synchronization
   function setupFirestoreSync(user) {
-    // Clear any previous listeners
     firestoreListeners.forEach((unsub) => unsub && unsub());
     firestoreListeners = [];
 
-    // Listen to groups where user is a member
     const unsubGroups = db.collection('groups').where('members', 'array-contains', user.uid).onSnapshot((snapshot) => {
       const groups = [];
       const memberUids = new Set();
@@ -1706,14 +1788,18 @@
       });
       state.groups = groups;
 
-      // Sync member profiles
+      // Sync member profile details from /users
       memberUids.forEach((mUid) => {
         if (!state.people.find((p) => p.id === mUid)) {
           db.collection('users').doc(mUid).get().then((uDoc) => {
             if (uDoc.exists) {
               const uData = uDoc.data();
               if (!state.people.find((p) => p.id === mUid)) {
-                state.people.push({ id: mUid, name: uData.name || 'Friend', color: uData.color || COLORS[state.people.length % COLORS.length] });
+                state.people.push({
+                  id: mUid,
+                  name: uData.name || 'Friend',
+                  color: uData.color || COLORS[state.people.length % COLORS.length]
+                });
                 render();
               }
             }
@@ -1721,12 +1807,11 @@
         }
       });
 
-      // Listen to expenses and settlements for all user groups
+      // Listen to expenses, settlements, and activity in all groups
       groups.forEach((g) => {
         const unsubExp = db.collection('groups').doc(g.id).collection('expenses').onSnapshot((expSnap) => {
           const groupExp = [];
           expSnap.forEach((eDoc) => groupExp.push({ id: eDoc.id, ...eDoc.data() }));
-          // Replace expenses for this group
           state.expenses = state.expenses.filter((e) => e.groupId !== g.id).concat(groupExp);
           render();
         });
@@ -1740,7 +1825,7 @@
         });
         firestoreListeners.push(unsubSettle);
 
-        const unsubAct = db.collection('groups').doc(g.id).collection('activity').limit(20).onSnapshot((actSnap) => {
+        const unsubAct = db.collection('groups').doc(g.id).collection('activity').limit(25).onSnapshot((actSnap) => {
           const groupAct = [];
           actSnap.forEach((aDoc) => groupAct.push({ id: aDoc.id, ...aDoc.data() }));
           state.activity = state.activity.filter((a) => a.groupId !== g.id).concat(groupAct);
@@ -1751,7 +1836,7 @@
 
       render();
     }, (err) => {
-      console.warn('Groups listener warning:', err);
+      console.warn('Groups listener error:', err);
     });
     firestoreListeners.push(unsubGroups);
   }
@@ -1771,22 +1856,26 @@
           currentFirebaseUser = user;
           if (user) {
             ME = user.uid;
-            // Ensure user profile in people
-            const myName = user.displayName || user.email.split('@')[0];
+            const myName = user.displayName || (user.email ? user.email.split('@')[0] : 'You');
+            const cleanEmail = (user.email || '').toLowerCase().trim();
             const myProfile = { id: user.uid, name: myName, color: COLORS[0] };
+
             const existingIdx = state.people.findIndex((p) => p.id === user.uid);
             if (existingIdx >= 0) state.people[existingIdx] = myProfile;
-            else state.people.unshift(myProfile);
+            else state.people = [myProfile];
 
-            // Save user profile in Firestore
+            // Always ensure the user profile is written to Firestore so friends can search & display it
             try {
               await db.collection('users').doc(user.uid).set({
                 id: user.uid,
                 name: myName,
-                email: user.email.toLowerCase(),
+                email: cleanEmail,
+                color: COLORS[0],
                 updatedAt: Date.now()
               }, { merge: true });
-            } catch (e) {}
+            } catch (e) {
+              console.warn('Profile write warning:', e);
+            }
 
             setupFirestoreSync(user);
             await checkUrlInvite();
@@ -1794,7 +1883,7 @@
             ME = 'me';
             firestoreListeners.forEach((unsub) => unsub && unsub());
             firestoreListeners = [];
-            state = loadState();
+            state = defaultState();
           }
           render();
         });
@@ -1805,7 +1894,7 @@
     }
   }
 
-  // Register service worker for offline PWA capabilities
+  // Register service worker for PWA
   if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')) {
     navigator.serviceWorker.register('./sw.js').then((reg) => {
       reg.onupdatefound = () => {
@@ -1826,7 +1915,6 @@
   window.__kongsi = {
     state,
     shares,
-    baseShares,
     ledger,
     simplify,
     myTotals,
