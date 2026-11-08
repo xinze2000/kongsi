@@ -1,8 +1,8 @@
-/* Kongsi - shared-expense app with Firebase cloud sync & offline PWA support. Vanilla JS, no build step. */
+/* Kongsi - shared-expense app with Direct Friends, Group management & real-time sync. Vanilla JS. */
 (function () {
   'use strict';
 
-  const STORE_KEY = 'kongsi.v3';
+  const STORE_KEY = 'kongsi.v4';
   let ME = 'me';
   const CUR = {
     MYR: { sym: 'RM', dec: 2, rate: 1 },
@@ -57,7 +57,7 @@
   };
   const rm = (minor) => money(minor, 'MYR');
 
-  // Completely clean, fresh state without any pre-populated demo data
+  // Completely clean initial state
   const defaultState = () => {
     return {
       people: [{ id: 'me', name: 'You', color: COLORS[0] }],
@@ -88,9 +88,9 @@
 
   function loadState() {
     try {
-      // Clear legacy demo keys
       localStorage.removeItem('kongsi.v1');
       localStorage.removeItem('kongsi.v2');
+      localStorage.removeItem('kongsi.v3');
       const raw = localStorage.getItem(STORE_KEY);
       if (!raw) return defaultState();
       const parsed = JSON.parse(raw);
@@ -124,7 +124,7 @@
       const found = state.people.find((p) => p.id === id);
       return found || { id: ME, name: currentFirebaseUser.displayName || currentFirebaseUser.email.split('@')[0], color: COLORS[0] };
     }
-    return state.people.find((p) => p.id === id) || { id, name: id ? (id.length > 8 ? id.slice(0, 6) : id) : 'Member', color: '#999' };
+    return state.people.find((p) => p.id === id) || { id, name: id ? (id.length > 10 ? id.slice(0, 6) : id) : 'Member', color: '#999' };
   }
 
   function group(id) {
@@ -298,7 +298,7 @@
     `;
   }
 
-  // BOTTOM TAB BAR: Center the (+) Add Expense button between Home/Groups and Activity/Balances
+  // BOTTOM TAB BAR: Centered Floating (+) Button
   function renderTabbar() {
     const leftItems = [
       { key: 'home', label: 'Home', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9.5L12 3l9 6.5"></path><path d="M5 10v9h14v-9"></path></svg>' },
@@ -328,8 +328,7 @@
     plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"></path></svg>',
     gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .63 1.7 1.7 0 0 0-.4 1.12V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1-.63 1.7 1.7 0 0 0-1.12.4l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.63-1 1.7 1.7 0 0 0-1.12-.4H2.76a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0 .63-1 1.7 1.7 0 0 0-.4-1.12l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.63 1.7 1.7 0 0 0 .4-1.12V2.76a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1 .63 1.7 1.7 0 0 0 1.12-.4l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.26.26.6.4 1 .4h.09a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"></path></svg>',
     trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M9 6V4h6v2"></path></svg>',
-    edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>',
-    share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>'
+    edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>'
   };
 
   function activityTitle(item) {
@@ -400,8 +399,8 @@
       <div style="padding:28px 16px;text-align:center;">
         <div style="font-size:38px;margin-bottom:8px;">👥</div>
         <div style="font-weight:700;font-size:16px;">No groups yet</div>
-        <div style="color:var(--ink-2);font-size:13px;margin:6px 0 16px;">Create a group for a trip, housemates, or dinner to start splitting.</div>
-        <button class="btn sm" data-action="new-group" style="margin:0 auto;">${I.plus}Create your first group</button>
+        <div style="color:var(--ink-2);font-size:13px;margin:6px 0 16px;">Create a group for trips, home, or dinner.</div>
+        <button class="btn sm" data-action="new-group" style="margin:0 auto;">${I.plus}Create group</button>
       </div>
     `;
 
@@ -449,6 +448,23 @@
 
       <div class="section" style="margin-top:20px;">
         <div class="section-h">
+          <h2>Friends (Direct)</h2>
+          <button class="link" data-action="open-add-friend">+ Add friend</button>
+        </div>
+        <div class="card flush">
+          ${friendsMarkup || `
+            <div style="padding:24px 16px;text-align:center;">
+              <div style="font-size:32px;margin-bottom:6px;">🤝</div>
+              <div style="font-weight:700;font-size:15px;">No direct friends yet</div>
+              <p style="font-size:12.5px;color:var(--ink-2);margin:4px 0 14px;">Add a friend to split 1-on-1 expenses and settle up directly without a group.</p>
+              <button class="btn sm" data-action="open-add-friend" style="margin:0 auto;">+ Add Friend</button>
+            </div>
+          `}
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-h">
           <h2>Groups</h2>
           <button class="link" data-action="new-group">+ New group</button>
         </div>
@@ -460,12 +476,7 @@
           <h2>Recent activity</h2>
           ${recent.length ? `<button class="link" data-action="tab" data-tab="activity">See all</button>` : ''}
         </div>
-        <div class="card flush">${recent.length ? recent.map(activityRow).join('') : emptyBlock('📭', 'No activity yet', 'Expenses and payments will show up here.')}</div>
-      </div>
-
-      <div class="section">
-        <div class="section-h"><h2>Friends</h2></div>
-        <div class="card flush">${friendsMarkup || emptyBlock('🤝', 'No friends yet', 'Add friends to a group using an invite link or email to split expenses.')}</div>
+        <div class="card flush">${recent.length ? recent.map(activityRow).join('') : emptyBlock('📭', 'No activity yet', 'Expenses and settlements will appear here.')}</div>
       </div>
     `;
   }
@@ -540,6 +551,7 @@
     const simplified = simplify(g);
     const expensesInGroup = state.expenses.filter((exp) => exp.groupId === groupId).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
+    // Member list with REMOVE MEMBER function
     const memberCards = (g.members || []).map((memberId) => `
       <div class="row">
         ${avatar(memberId)}
@@ -547,7 +559,10 @@
           <div class="t">${esc(memberId === ME ? 'You' : person(memberId).name)}</div>
           <div class="s">${balLabel(nets[memberId] || 0)}</div>
         </div>
-        <div class="amt"><b class="${balClass(nets[memberId] || 0)}">${rm(Math.abs(nets[memberId] || 0))}</b></div>
+        <div class="amt" style="display:flex;align-items:center;gap:8px;">
+          <b class="${balClass(nets[memberId] || 0)}">${rm(Math.abs(nets[memberId] || 0))}</b>
+          ${memberId !== ME ? `<button class="btn-remove" data-action="remove-group-member" data-group="${g.id}" data-member="${memberId}" title="Remove member from group">Remove</button>` : ''}
+        </div>
       </div>
     `).join('');
 
@@ -613,6 +628,7 @@
     `;
   }
 
+  // View a Direct Friend (No group needed)
   function renderPerson(personId) {
     const p = person(personId);
     const bal = pairBal(ME, personId);
@@ -625,24 +641,39 @@
         <h2 style="margin-top:12px;font-size:24px;">${esc(p.name)}</h2>
         <div class="${balClass(bal)}" style="font-size:28px;font-weight:800;margin-top:12px;">${rm(Math.abs(bal))}</div>
         <div style="color:var(--ink-2);margin-top:4px;">${balLabel(bal)}</div>
-        ${bal !== 0 ? `<div style="margin-top:16px;"><button class="btn" data-action="settle-person" data-id="${personId}">Settle Up</button></div>` : ''}
+
+        <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;">
+          <button class="btn sm" data-action="add-direct-expense" data-id="${personId}">
+            ${I.plus}Add expense with ${esc(p.name)}
+          </button>
+          ${bal !== 0 ? `<button class="btn sm secondary" data-action="settle-person" data-id="${personId}">Settle Up</button>` : ''}
+        </div>
       </div>
 
       <div class="section">
         <div class="section-h"><h2>Shared Expenses</h2></div>
         <div class="card flush">
-          ${relatedExpenses.map((exp) => `
-            <button class="row tappable" data-action="open-expense" data-id="${exp.id}">
-              <span class="tile">🧾</span>
-              <div class="grow">
-                <div class="t">${esc(exp.desc)}</div>
-                <div class="s">${esc(nm(exp.payer))} paid · ${fmtDate(exp.date)}</div>
-              </div>
-              <div class="amt"><b>${money(exp.amount, exp.currency || 'MYR')}</b></div>
-            </button>
-          `).join('') || emptyBlock('🤝', 'No shared expenses', 'Expenses between you and this person will appear here.')}
+          ${relatedExpenses.map((exp) => {
+            const g = group(exp.groupId);
+            return `
+              <button class="row tappable" data-action="open-expense" data-id="${exp.id}">
+                <span class="tile">🧾</span>
+                <div class="grow">
+                  <div class="t">${esc(exp.desc)}</div>
+                  <div class="s">${esc(nm(exp.payer))} paid · ${fmtDate(exp.date)} ${g ? `· ${esc(g.name)}` : '· (Direct)'}</div>
+                </div>
+                <div class="amt"><b>${money(exp.amount, exp.currency || 'MYR')}</b></div>
+              </button>
+            `;
+          }).join('') || emptyBlock('🤝', 'No shared expenses yet', `Tap "+ Add expense with ${esc(p.name)}" above to split a bill directly.`)}
         </div>
       </div>
+
+      ${bal === 0 ? `
+        <div style="margin-top:24px;text-align:center;">
+          <button class="link" data-action="remove-friend" data-id="${personId}" style="color:var(--neg);font-size:13px;">Remove friend</button>
+        </div>
+      ` : ''}
     `;
   }
 
@@ -660,7 +691,9 @@
         <h2 style="margin-top:12px;font-size:22px;">${esc(exp.desc)}</h2>
         <div style="font-size:32px;font-weight:800;color:var(--brand);margin-top:8px;">${money(exp.amount, exp.currency || 'MYR')}</div>
         <div style="color:var(--ink-2);margin-top:6px;">Paid by <b>${esc(nm(exp.payer))}</b> on ${fmtDate(exp.date)}</div>
-        ${g ? `<div style="margin-top:6px;"><span class="chip on">${g.emoji || '👥'} ${esc(g.name)}</span></div>` : ''}
+        <div style="margin-top:8px;">
+          ${g ? `<span class="chip on">${g.emoji || '👥'} ${esc(g.name)}</span>` : `<span class="direct-chip">Direct Expense</span>`}
+        </div>
       </div>
 
       <div class="section">
@@ -716,29 +749,48 @@
     render();
   }
 
+  // Draft for Group or General Expense
   function newDraft(groupId = null) {
-    if (!state.groups.length) {
-      toast('Please create a group first', true);
-      newGroup();
-      return null;
-    }
-    const defaultGroup = (groupId && group(groupId)) || state.groups[0];
-    const members = defaultGroup.members || [ME];
+    const defaultGroup = (groupId && group(groupId)) || state.groups[0] || null;
+    const friends = state.people.filter(p => p.id !== ME);
+    const members = defaultGroup ? (defaultGroup.members || [ME]) : (friends.length ? [ME, friends[0].id] : [ME]);
+
     return {
       id: null,
       desc: '',
       amount: '',
       currency: 'MYR',
       date: todayISO(),
-      groupId: defaultGroup.id,
-      payer: members.includes(ME) ? ME : members[0],
+      groupId: defaultGroup ? defaultGroup.id : null,
+      directFriendId: defaultGroup ? null : (friends[0]?.id || null),
+      payer: ME,
       participants: [...members],
       method: 'equal',
       percent: {},
       exact: {},
       autoExact: true,
       autoPercent: true,
-      recurring: null,
+      error: null
+    };
+  }
+
+  // Draft for Direct 1-on-1 Expense with a Friend
+  function newDirectDraft(friendId) {
+    return {
+      id: null,
+      desc: '',
+      amount: '',
+      currency: 'MYR',
+      date: todayISO(),
+      groupId: null,
+      directFriendId: friendId,
+      payer: ME,
+      participants: [ME, friendId],
+      method: 'equal',
+      percent: {},
+      exact: {},
+      autoExact: true,
+      autoPercent: true,
       error: null
     };
   }
@@ -814,13 +866,10 @@
 
   function makeExpenseFormHtml(animate = true) {
     if (!draft) return '';
-    const g = group(draft.groupId) || state.groups[0];
-    if (!g) return '';
-    const memberButtons = (g.members || []).map((memberId) => `
-      <button class="chip ${draft.participants.includes(memberId) ? 'on' : ''}" data-action="toggle-participant" data-id="${memberId}">
-        ${avatar(memberId, 'sm')} ${esc(memberId === ME ? 'You' : person(memberId).name)}
-      </button>
-    `).join('');
+    const isDirect = !draft.groupId && draft.directFriendId;
+    const directFriend = isDirect ? person(draft.directFriendId) : null;
+    const g = draft.groupId ? group(draft.groupId) : null;
+    const participantsList = draft.participants || [ME];
 
     return `
       <div class="sheet${animate ? '' : ' still'}">
@@ -833,7 +882,7 @@
         <div class="fm-body" style="padding:14px 0;">
           <div class="field">
             <label>Description</label>
-            <input class="input" data-field="desc" value="${esc(draft.desc)}" placeholder="Dinner, groceries, trip, etc." />
+            <input class="input" data-field="desc" value="${esc(draft.desc)}" placeholder="Dinner, groceries, coffee, etc." />
           </div>
 
           <div class="field amount-wrap">
@@ -847,27 +896,41 @@
           </div>
 
           <div class="field">
-            <label>Group</label>
+            <label>Split Type</label>
             <div class="chips">
-              ${state.groups.map((item) => `
-                <button class="chip ${item.id === draft.groupId ? 'on' : ''}" data-action="pick-group" data-id="${item.id}">${item.emoji || '👥'} ${esc(item.name)}</button>
-              `).join('')}
+              ${isDirect ? `
+                <span class="chip on">Direct with ${esc(directFriend.name)}</span>
+              ` : `
+                ${state.groups.map((item) => `
+                  <button class="chip ${item.id === draft.groupId ? 'on' : ''}" data-action="pick-group" data-id="${item.id}">${item.emoji || '👥'} ${esc(item.name)}</button>
+                `).join('')}
+              `}
             </div>
           </div>
 
           <div class="field">
             <label>Paid by</label>
             <div class="chips">
-              ${(g.members || []).map((memberId) => `
-                <button class="chip ${draft.payer === memberId ? 'on' : ''}" data-action="pick-payer" data-id="${memberId}">${avatar(memberId, 'sm')} ${esc(memberId === ME ? 'You' : person(memberId).name)}</button>
+              ${participantsList.map((memberId) => `
+                <button class="chip ${draft.payer === memberId ? 'on' : ''}" data-action="pick-payer" data-id="${memberId}">
+                  ${avatar(memberId, 'sm')} ${esc(memberId === ME ? 'You' : person(memberId).name)}
+                </button>
               `).join('')}
             </div>
           </div>
 
-          <div class="field">
-            <label>Participants</label>
-            <div class="chips">${memberButtons}</div>
-          </div>
+          ${!isDirect ? `
+            <div class="field">
+              <label>Participants</label>
+              <div class="chips">
+                ${(g ? g.members : participantsList).map((memberId) => `
+                  <button class="chip ${draft.participants.includes(memberId) ? 'on' : ''}" data-action="toggle-participant" data-id="${memberId}">
+                    ${avatar(memberId, 'sm')} ${esc(memberId === ME ? 'You' : person(memberId).name)}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
 
           <div class="field">
             <label>Split method</label>
@@ -887,36 +950,6 @@
             <label>Date</label>
             <input class="input" type="date" data-field="date" value="${draft.date}" />
           </div>
-
-          ${draft.method === 'exact' ? `
-            <div class="field">
-              <label>Exact amounts</label>
-              <div class="card flush">
-                ${draft.participants.map((memberId) => `
-                  <div class="row">
-                    ${avatar(memberId)}
-                    <div class="grow"><div class="t">${esc(memberId === ME ? 'You' : person(memberId).name)}</div></div>
-                    <input class="input" data-field="exact" data-member="${memberId}" value="${esc(draft.exact[memberId] ?? '')}" style="max-width:110px;" />
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          ` : ''}
-
-          ${draft.method === 'percent' ? `
-            <div class="field">
-              <label>Percentages</label>
-              <div class="card flush">
-                ${draft.participants.map((memberId) => `
-                  <div class="row">
-                    ${avatar(memberId)}
-                    <div class="grow"><div class="t">${esc(memberId === ME ? 'You' : person(memberId).name)}</div></div>
-                    <input class="input" data-field="percent" data-member="${memberId}" value="${esc(draft.percent[memberId] ?? '')}" style="max-width:110px;" />
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          ` : ''}
 
           <div class="field" style="margin-top:20px;">
             <button class="btn" data-action="save-expense">${draft.id ? 'Save changes' : 'Save expense'}</button>
@@ -947,7 +980,8 @@
       amount: String((item.amount || 0) / (10 ** (CUR[item.currency || 'MYR'] || CUR.MYR).dec)),
       currency: item.currency || 'MYR',
       date: item.date,
-      groupId: item.groupId,
+      groupId: item.groupId || null,
+      directFriendId: item.groupId ? null : (item.participants.find(p => p !== ME) || null),
       payer: item.payer,
       participants: [...(item.participants || [])],
       method: item.method || 'equal',
@@ -958,19 +992,12 @@
       ])),
       autoExact: false,
       autoPercent: false,
-      recurring: item.recurring || null,
       error: null
     };
   }
 
   async function saveExpense() {
     if (!draft) return;
-    const groupId = draft.groupId || state.groups[0]?.id;
-    const g = group(groupId);
-    if (!g) {
-      toast('Please create a group before adding an expense', true);
-      return;
-    }
 
     const amount = toMinor(draft.amount, draft.currency);
     if (!draft.desc.trim() || !amount) {
@@ -995,7 +1022,7 @@
 
     const expenseItem = {
       id: draft.id || uid('exp'),
-      groupId,
+      groupId: draft.groupId || null,
       desc: draft.desc.trim(),
       amount,
       currency: draft.currency,
@@ -1010,33 +1037,37 @@
 
     if (isFirebaseConfigured && currentFirebaseUser && db) {
       try {
-        await db.collection('groups').doc(groupId).collection('expenses').doc(expenseItem.id).set(expenseItem);
-        await db.collection('groups').doc(groupId).collection('activity').doc(uid('act')).set({
-          id: uid('act'),
-          type: draft.id ? 'expense_edited' : 'expense_added',
-          ts: Date.now(),
-          actor: ME,
-          expenseId: expenseItem.id,
-          desc: expenseItem.desc,
-          amount: expenseItem.amount,
-          cur: expenseItem.currency,
-          payer: expenseItem.payer,
-          groupId
-        });
+        if (draft.groupId) {
+          // Group expense
+          await db.collection('groups').doc(draft.groupId).collection('expenses').doc(expenseItem.id).set(expenseItem);
+          await db.collection('groups').doc(draft.groupId).collection('activity').doc(uid('act')).set({
+            id: uid('act'),
+            type: draft.id ? 'expense_edited' : 'expense_added',
+            ts: Date.now(),
+            actor: ME,
+            expenseId: expenseItem.id,
+            desc: expenseItem.desc,
+            amount: expenseItem.amount,
+            cur: expenseItem.currency,
+            payer: expenseItem.payer,
+            groupId: draft.groupId
+          });
+        } else {
+          // Direct 1-on-1 expense
+          await db.collection('direct_expenses').doc(expenseItem.id).set(expenseItem);
+        }
         toast(draft.id ? 'Expense updated' : 'Expense saved');
       } catch (err) {
-        console.error('Firestore save expense error:', err);
-        toast(`Error saving to cloud: ${err.message}`, true);
+        console.error('Save error:', err);
+        toast(`Error saving: ${err.message}`, true);
       }
     } else {
       const existingIndex = state.expenses.findIndex((e) => e.id === expenseItem.id);
       if (existingIndex >= 0) {
         state.expenses[existingIndex] = expenseItem;
-        state.activity.push({ id: uid('act'), type: 'expense_edited', ts: Date.now(), actor: ME, expenseId: expenseItem.id, desc: expenseItem.desc, amount: expenseItem.amount, cur: expenseItem.currency, payer: expenseItem.payer, groupId: expenseItem.groupId });
         toast('Expense updated');
       } else {
         state.expenses.push(expenseItem);
-        state.activity.push({ id: uid('act'), type: 'expense_added', ts: Date.now(), actor: ME, expenseId: expenseItem.id, desc: expenseItem.desc, amount: expenseItem.amount, cur: expenseItem.currency, payer: expenseItem.payer, groupId: expenseItem.groupId });
         toast('Expense saved');
       }
       saveState();
@@ -1052,31 +1083,151 @@
 
     if (isFirebaseConfigured && currentFirebaseUser && db) {
       try {
-        await db.collection('groups').doc(item.groupId).collection('expenses').doc(id).delete();
-        await db.collection('groups').doc(item.groupId).collection('activity').doc(uid('act')).set({
-          id: uid('act'),
-          type: 'expense_deleted',
-          ts: Date.now(),
-          actor: ME,
-          expenseId: id,
-          desc: item.desc,
-          amount: item.amount,
-          cur: item.currency,
-          payer: item.payer,
-          groupId: item.groupId
-        });
+        if (item.groupId) {
+          await db.collection('groups').doc(item.groupId).collection('expenses').doc(id).delete();
+        } else {
+          await db.collection('direct_expenses').doc(id).delete();
+        }
         toast('Expense deleted');
       } catch (err) {
         toast(`Error: ${err.message}`, true);
       }
     } else {
       state.expenses = state.expenses.filter((e) => e.id !== id);
-      state.activity.push({ id: uid('act'), type: 'expense_deleted', ts: Date.now(), actor: ME, expenseId: id, desc: item.desc, amount: item.amount, cur: item.currency, payer: item.payer, groupId: item.groupId });
       saveState();
       toast('Expense deleted');
     }
     popView();
     render();
+  }
+
+  // Remove a member from a Group
+  async function removeMemberFromGroup(groupId, memberId) {
+    const g = group(groupId);
+    if (!g) return;
+    const pName = person(memberId).name;
+    if (!window.confirm(`Remove "${pName}" from ${g.name}?`)) return;
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await db.collection('groups').doc(groupId).update({
+          members: firebase.firestore.FieldValue.arrayRemove(memberId)
+        });
+        g.members = (g.members || []).filter((m) => m !== memberId);
+        toast(`Removed ${pName} from ${g.name}`);
+        if (overlayEl.innerHTML) openInviteSheet(groupId);
+        render();
+      } catch (err) {
+        toast(`Error removing member: ${err.message}`, true);
+      }
+    } else {
+      g.members = (g.members || []).filter((m) => m !== memberId);
+      saveState();
+      toast(`Removed ${pName}`);
+      if (overlayEl.innerHTML) openInviteSheet(groupId);
+      render();
+    }
+  }
+
+  // Add Direct Friend Modal
+  function openAddFriendModal() {
+    overlayEl.innerHTML = `
+      <div class="scrim" data-action="close-modal"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="fm-head">
+          <button class="txt" data-action="close-modal">Cancel</button>
+          <h2>Add a Friend</h2>
+          <span></span>
+        </div>
+        <div style="padding:16px 0;">
+          <p style="font-size:13px;color:var(--ink-2);margin-bottom:14px;line-height:1.4;">
+            Split bills directly 1-on-1 and settle up without needing a group. Enter your friend's name or registered email:
+          </p>
+          <div class="field">
+            <label>Friend's Name or Email</label>
+            <input class="input" id="friend-input-name" placeholder="e.g. Sarah or sarah@gmail.com" />
+          </div>
+          <div style="margin-top:20px;">
+            <button class="btn" data-action="do-add-friend">Add Friend</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function handleAddFriend() {
+    const input = document.getElementById('friend-input-name');
+    const raw = input?.value?.trim() || '';
+    const cleanEmail = raw.toLowerCase();
+
+    if (!raw) {
+      toast('Please enter a friend name or email', true);
+      return;
+    }
+
+    if (isFirebaseConfigured && db && currentFirebaseUser) {
+      try {
+        let friendUid = null;
+        let friendName = raw;
+        let friendColor = COLORS[state.people.length % COLORS.length];
+
+        // Search registered users
+        const snap = await db.collection('users').where('email', '==', cleanEmail).limit(1).get();
+        if (!snap.empty) {
+          const doc = snap.docs[0];
+          friendUid = doc.id;
+          friendName = doc.data().name || raw;
+          friendColor = doc.data().color || friendColor;
+        } else {
+          // Search by name
+          const nSnap = await db.collection('users').where('name', '==', raw).limit(1).get();
+          if (!nSnap.empty) {
+            friendUid = nSnap.docs[0].id;
+            friendName = nSnap.docs[0].data().name;
+            friendColor = nSnap.docs[0].data().color || friendColor;
+          }
+        }
+
+        if (!friendUid) {
+          // Create a named friend entry so user can split immediately
+          friendUid = uid('friend');
+          await db.collection('users').doc(friendUid).set({
+            id: friendUid,
+            name: raw,
+            email: cleanEmail.includes('@') ? cleanEmail : '',
+            color: friendColor,
+            isCustomFriend: true,
+            updatedAt: Date.now()
+          });
+        }
+
+        // Add to user's friends list
+        await db.collection('users').doc(currentFirebaseUser.uid).collection('friends').doc(friendUid).set({
+          id: friendUid,
+          name: friendName,
+          color: friendColor,
+          addedAt: Date.now()
+        });
+
+        if (!state.people.find(p => p.id === friendUid)) {
+          state.people.push({ id: friendUid, name: friendName, color: friendColor });
+        }
+
+        closeModal();
+        toast(`Added ${friendName} to friends!`);
+        pushView('person', friendUid);
+      } catch (err) {
+        toast(`Error: ${err.message}`, true);
+      }
+    } else {
+      const friendId = uid('f');
+      state.people.push({ id: friendId, name: raw, color: COLORS[state.people.length % COLORS.length] });
+      saveState();
+      closeModal();
+      toast(`Added ${raw}!`);
+      pushView('person', friendId);
+    }
   }
 
   async function newGroup() {
@@ -1089,21 +1240,13 @@
     if (isFirebaseConfigured && currentFirebaseUser && db) {
       try {
         await db.collection('groups').doc(id).set(newG);
-        await db.collection('groups').doc(id).collection('activity').doc(uid('act')).set({
-          id: uid('act'),
-          type: 'group_created',
-          ts: Date.now(),
-          actor: ME,
-          groupId: id
-        });
         toast('Group created!');
         pushView('group', id);
       } catch (err) {
-        toast(`Error creating group: ${err.message}`, true);
+        toast(`Error: ${err.message}`, true);
       }
     } else {
       state.groups.push(newG);
-      state.activity.push({ id: uid('act'), type: 'group_created', ts: Date.now(), actor: ME, groupId: id });
       saveState();
       toast('Group created!');
       pushView('group', id);
@@ -1121,7 +1264,7 @@
         <div class="grab"></div>
         <div class="fm-head">
           <button class="txt" data-action="close-modal">Done</button>
-          <h2>Invite to ${esc(g.name)}</h2>
+          <h2>${esc(g.name)} Members</h2>
           <span></span>
         </div>
         <div style="padding:16px 0;">
@@ -1140,23 +1283,21 @@
           </div>
 
           <div style="margin-top:20px;">
-            <label style="font-size:13px;font-weight:700;color:var(--ink-2);text-transform:uppercase;">Add friend by Name or Email</label>
-            <p style="font-size:12.5px;color:var(--ink-2);margin:4px 0 8px;">
-              Enter your friend's registered email address OR type their name:
-            </p>
-            <div style="display:flex;gap:8px;">
+            <label style="font-size:13px;font-weight:700;color:var(--ink-2);text-transform:uppercase;">Add by Name or Email</label>
+            <div style="display:flex;gap:8px;margin-top:8px;">
               <input class="input" id="invite-email-input" type="text" placeholder="e.g. friend@gmail.com or Alex" />
               <button class="btn sm" data-action="add-member-email" data-group="${g.id}">Add</button>
             </div>
           </div>
 
           <div style="margin-top:24px;">
-            <label style="font-size:13px;font-weight:700;color:var(--ink-2);text-transform:uppercase;">Group Members (${(g.members || []).length})</label>
+            <label style="font-size:13px;font-weight:700;color:var(--ink-2);text-transform:uppercase;">Current Members (${(g.members || []).length})</label>
             <div class="card flush" style="margin-top:8px;">
               ${(g.members || []).map((mid) => `
                 <div class="row">
                   ${avatar(mid)}
                   <div class="grow"><div class="t">${esc(mid === ME ? 'You' : person(mid).name)}</div></div>
+                  ${mid !== ME ? `<button class="btn-remove" data-action="remove-group-member" data-group="${g.id}" data-member="${mid}" title="Remove member">Remove</button>` : ''}
                 </div>
               `).join('')}
             </div>
@@ -1287,7 +1428,7 @@
         </div>
         <div style="padding:14px 0;">
           <p style="font-size:13px;color:var(--ink-2);margin-bottom:12px;">
-            Firebase configuration currently loaded in your app:
+            Firebase configuration loaded in app:
           </p>
           <textarea id="firebase-cfg-input" class="input" style="height:140px;font-family:monospace;font-size:12px;padding:10px;">${esc(currentCfg)}</textarea>
           <div style="margin-top:14px;display:flex;gap:10px;">
@@ -1322,38 +1463,40 @@
       })
       .filter((item) => item.amount > 0);
 
-    const targetGroupId = alloc[0]?.groupId || state.groups[0]?.id;
+    const targetGroupId = alloc[0]?.groupId || null;
 
-    if (isFirebaseConfigured && currentFirebaseUser && db && targetGroupId) {
+    if (isFirebaseConfigured && currentFirebaseUser && db) {
       try {
         const settleId = uid('settle');
-        await db.collection('groups').doc(targetGroupId).collection('settlements').doc(settleId).set({
-          id: settleId,
-          from,
-          to,
-          amount: numeric,
-          date: todayISO(),
-          groupId: targetGroupId,
-          alloc,
-          createdAt: Date.now()
-        });
-        await db.collection('groups').doc(targetGroupId).collection('activity').doc(uid('act')).set({
-          id: uid('act'),
-          type: 'payment',
-          ts: Date.now(),
-          actor: from,
-          from,
-          to,
-          amount: numeric,
-          groupId: targetGroupId
-        });
+        if (targetGroupId) {
+          await db.collection('groups').doc(targetGroupId).collection('settlements').doc(settleId).set({
+            id: settleId,
+            from,
+            to,
+            amount: numeric,
+            date: todayISO(),
+            groupId: targetGroupId,
+            alloc,
+            createdAt: Date.now()
+          });
+        } else {
+          // Direct 1-on-1 settlement
+          await db.collection('direct_settlements').doc(settleId).set({
+            id: settleId,
+            from,
+            to,
+            amount: numeric,
+            date: todayISO(),
+            participants: [from, to],
+            createdAt: Date.now()
+          });
+        }
         toast('Payment recorded');
       } catch (err) {
-        toast(`Error recording payment: ${err.message}`, true);
+        toast(`Error: ${err.message}`, true);
       }
     } else {
       state.settlements.push({ id: uid('settle'), from, to, amount: numeric, date: todayISO(), alloc, createdAt: Date.now() });
-      state.activity.push({ id: uid('act'), type: 'payment', ts: Date.now(), actor: from, from, to, amount: numeric, groupId: null });
       saveState();
       toast('Payment recorded');
       render();
@@ -1412,6 +1555,49 @@
       return;
     }
 
+    if (action === 'open-add-friend') {
+      openAddFriendModal();
+      return;
+    }
+
+    if (action === 'do-add-friend') {
+      await handleAddFriend();
+      return;
+    }
+
+    if (action === 'add-direct-expense') {
+      const friendId = el.dataset.id;
+      draft = newDirectDraft(friendId);
+      ui.modal = true;
+      openModal();
+      return;
+    }
+
+    if (action === 'remove-friend') {
+      const friendId = el.dataset.id;
+      const fName = person(friendId).name;
+      if (window.confirm(`Remove ${fName} from friends?`)) {
+        if (isFirebaseConfigured && db && currentFirebaseUser) {
+          try {
+            await db.collection('users').doc(currentFirebaseUser.uid).collection('friends').doc(friendId).delete();
+          } catch (e) {}
+        }
+        state.people = state.people.filter(p => p.id !== friendId);
+        saveState();
+        popView();
+        toast(`Removed ${fName}`);
+        render();
+      }
+      return;
+    }
+
+    if (action === 'remove-group-member') {
+      const groupId = el.dataset.group;
+      const memberId = el.dataset.member;
+      await removeMemberFromGroup(groupId, memberId);
+      return;
+    }
+
     if (action === 'open-join-modal') {
       openJoinModal();
       return;
@@ -1459,9 +1645,7 @@
             url: url
           });
           return;
-        } catch (e) {
-          // Fallback to clipboard
-        }
+        } catch (e) {}
       }
       try {
         await navigator.clipboard.writeText(url);
@@ -1492,7 +1676,6 @@
           let friendName = rawVal;
           let friendColor = COLORS[(g.members || []).length % COLORS.length];
 
-          // 1. Search in /users by email
           const snap = await db.collection('users').where('email', '==', cleanEmail).limit(1).get();
           if (!snap.empty) {
             const doc = snap.docs[0];
@@ -1500,7 +1683,6 @@
             friendName = doc.data().name || rawVal;
             friendColor = doc.data().color || friendColor;
           } else {
-            // Search by name
             const nameSnap = await db.collection('users').where('name', '==', rawVal).limit(1).get();
             if (!nameSnap.empty) {
               const doc = nameSnap.docs[0];
@@ -1519,7 +1701,6 @@
             }
             toast(`Added ${friendName} to ${g.name}!`);
           } else {
-            // Add as member immediately so user is never blocked from splitting
             const memberId = uid('m');
             await db.collection('groups').doc(groupId).update({
               members: firebase.firestore.FieldValue.arrayUnion(memberId)
@@ -1532,13 +1713,13 @@
               updatedAt: Date.now()
             });
             state.people.push({ id: memberId, name: rawVal, color: friendColor });
-            toast(`Added ${rawVal} to ${g.name}! You can split expenses with them now.`);
+            toast(`Added ${rawVal} to ${g.name}!`);
           }
           openInviteSheet(groupId);
           render();
         } catch (err) {
           console.error('Error adding member:', err);
-          toast(`Error adding member: ${err.message}`, true);
+          toast(`Error: ${err.message}`, true);
         }
       } else {
         const localId = uid('friend');
@@ -1673,8 +1854,12 @@
 
     if (action === 'add-expense') {
       const currentView = ui.stack[ui.stack.length - 1];
-      const targetGroupId = currentView?.type === 'group' ? currentView.id : state.groups[0]?.id;
-      draft = newDraft(targetGroupId);
+      if (currentView?.type === 'person') {
+        draft = newDirectDraft(currentView.id);
+      } else {
+        const targetGroupId = currentView?.type === 'group' ? currentView.id : state.groups[0]?.id;
+        draft = newDraft(targetGroupId);
+      }
       if (draft) {
         ui.modal = true;
         openModal();
@@ -1690,6 +1875,7 @@
     if (action === 'pick-group') {
       const id = el.dataset.id;
       draft.groupId = id;
+      draft.directFriendId = null;
       const g = group(id);
       draft.payer = g?.members?.includes(ME) ? ME : g?.members?.[0] || ME;
       draft.participants = [...(g?.members || [ME])];
@@ -1773,11 +1959,28 @@
   document.addEventListener('input', (event) => updateDraftField(event.target));
   document.addEventListener('change', (event) => updateDraftField(event.target));
 
-  // Firebase Setup & Real-time Synchronization
+  // Firebase Setup & Real-time Synchronization (Groups, Friends, Direct Expenses & Settlements)
   function setupFirestoreSync(user) {
     firestoreListeners.forEach((unsub) => unsub && unsub());
     firestoreListeners = [];
 
+    // 1. Listen to User's Direct Friends list
+    const unsubFriends = db.collection('users').doc(user.uid).collection('friends').onSnapshot((fSnap) => {
+      fSnap.forEach((doc) => {
+        const fData = doc.data();
+        if (!state.people.find(p => p.id === doc.id)) {
+          state.people.push({
+            id: doc.id,
+            name: fData.name || 'Friend',
+            color: fData.color || COLORS[state.people.length % COLORS.length]
+          });
+        }
+      });
+      render();
+    });
+    firestoreListeners.push(unsubFriends);
+
+    // 2. Listen to Groups
     const unsubGroups = db.collection('groups').where('members', 'array-contains', user.uid).onSnapshot((snapshot) => {
       const groups = [];
       const memberUids = new Set();
@@ -1807,7 +2010,7 @@
         }
       });
 
-      // Listen to expenses, settlements, and activity in all groups
+      // Listen to expenses & settlements in all groups
       groups.forEach((g) => {
         const unsubExp = db.collection('groups').doc(g.id).collection('expenses').onSnapshot((expSnap) => {
           const groupExp = [];
@@ -1839,6 +2042,24 @@
       console.warn('Groups listener error:', err);
     });
     firestoreListeners.push(unsubGroups);
+
+    // 3. Listen to Direct 1-on-1 Expenses
+    const unsubDirectExp = db.collection('direct_expenses').where('participants', 'array-contains', user.uid).onSnapshot((dSnap) => {
+      const dExp = [];
+      dSnap.forEach((dDoc) => dExp.push({ id: dDoc.id, ...dDoc.data() }));
+      state.expenses = state.expenses.filter((e) => e.groupId != null).concat(dExp);
+      render();
+    });
+    firestoreListeners.push(unsubDirectExp);
+
+    // 4. Listen to Direct 1-on-1 Settlements
+    const unsubDirectSettle = db.collection('direct_settlements').where('participants', 'array-contains', user.uid).onSnapshot((sSnap) => {
+      const dSettle = [];
+      sSnap.forEach((sDoc) => dSettle.push({ id: sDoc.id, ...sDoc.data() }));
+      state.settlements = state.settlements.filter((s) => s.groupId != null).concat(dSettle);
+      render();
+    });
+    firestoreListeners.push(unsubDirectSettle);
   }
 
   function initFirebase() {
@@ -1864,7 +2085,6 @@
             if (existingIdx >= 0) state.people[existingIdx] = myProfile;
             else state.people = [myProfile];
 
-            // Always ensure the user profile is written to Firestore so friends can search & display it
             try {
               await db.collection('users').doc(user.uid).set({
                 id: user.uid,

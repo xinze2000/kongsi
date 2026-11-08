@@ -2,22 +2,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // User profile documents: any authenticated user can read profiles (needed for friends lookup & displaying names)
+    // User profile documents & subcollections
     match /users/{userId} {
       allow read: if request.auth != null;
-      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null;
+      
+      match /friends/{friendId} {
+        allow read, write: if request.auth != null;
+      }
     }
     
     // Groups collection
     match /groups/{groupId} {
-      // Any authenticated user can read group info or join via invite link
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      // Allow updating members list (joining or inviting)
-      allow update: if request.auth != null;
+      allow read, create, update: if request.auth != null;
       allow delete: if request.auth != null && request.auth.uid == resource.data.createdBy;
 
-      // Group subcollections: only accessible to group members
       match /expenses/{expenseId} {
         allow read, write: if request.auth != null;
       }
@@ -29,6 +28,15 @@ service cloud.firestore {
       match /activity/{activityId} {
         allow read, write: if request.auth != null;
       }
+    }
+
+    // Direct 1-on-1 expenses & settlements (no group required)
+    match /direct_expenses/{expenseId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /direct_settlements/{settlementId} {
+      allow read, write: if request.auth != null;
     }
   }
 }
