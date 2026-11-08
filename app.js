@@ -592,7 +592,7 @@
     `).join('') : emptyBlock('🧾', 'No expenses yet', 'Tap Add expense below to record your first shared bill.');
 
     return `
-      ${backBar(g.name, `<button class="btn sm secondary" data-action="invite-group" data-id="${g.id}">+ Invite</button>`)}
+      ${backBar(g.name, `<button class="btn sm secondary" data-action="invite-group" data-id="${g.id}">+ Invite</button><button class="iconbtn" data-action="delete-group" data-id="${g.id}" title="Delete group" style="color:var(--neg);margin-left:4px;">${I.trash}</button>`)}
       <div class="card" style="margin-top:14px;padding:20px;text-align:center;">
         <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
           <span class="tile lg">${g.emoji || '👥'}</span>
@@ -624,6 +624,10 @@
       <div class="section">
         <div class="section-h"><h2>Expenses</h2></div>
         <div class="card flush">${expenseCards}</div>
+      </div>
+
+      <div style="margin-top:32px;padding-bottom:24px;text-align:center;">
+        <button class="link" data-action="delete-group" data-id="${g.id}" style="color:var(--neg);font-size:13px;">Delete this group</button>
       </div>
     `;
   }
@@ -1253,6 +1257,36 @@
     }
   }
 
+  async function deleteGroup(groupId) {
+    const g = group(groupId);
+    if (!g) return;
+    if (!window.confirm(`Delete the group "${g.name}"?\n\nThis will remove the group and its shared expenses.`)) {
+      return;
+    }
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await db.collection('groups').doc(groupId).delete();
+        state.groups = state.groups.filter(x => x.id !== groupId);
+        state.expenses = state.expenses.filter(x => x.groupId !== groupId);
+        state.settlements = state.settlements.filter(x => x.groupId !== groupId);
+        toast(`Group "${g.name}" deleted`);
+      } catch (err) {
+        toast(`Error: ${err.message}`, true);
+        return;
+      }
+    } else {
+      state.groups = state.groups.filter(x => x.id !== groupId);
+      state.expenses = state.expenses.filter(x => x.groupId !== groupId);
+      state.settlements = state.settlements.filter(x => x.groupId !== groupId);
+      saveState();
+      toast(`Group "${g.name}" deleted`);
+    }
+
+    popView();
+    render();
+  }
+
   function openInviteSheet(groupId) {
     const g = group(groupId);
     if (!g) return;
@@ -1552,6 +1586,11 @@
 
     if (action === 'new-group') {
       await newGroup();
+      return;
+    }
+
+    if (action === 'delete-group') {
+      await deleteGroup(el.dataset.id);
       return;
     }
 
