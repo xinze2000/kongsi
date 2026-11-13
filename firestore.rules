@@ -1,41 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // User profile documents & subcollections
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
-      
-      match /friends/{friendId} {
-        allow read, write: if request.auth != null;
-      }
-    }
-    
-    // Groups collection
-    match /groups/{groupId} {
-      allow read, create, update: if request.auth != null;
-      allow delete: if request.auth != null;
-
-      match /expenses/{expenseId} {
-        allow read, write: if request.auth != null;
-      }
-      
-      match /settlements/{settlementId} {
-        allow read, write: if request.auth != null;
-      }
-
-      match /activity/{activityId} {
-        allow read, write: if request.auth != null;
-      }
-    }
-
-    // Direct 1-on-1 expenses & settlements (no group required)
-    match /direct_expenses/{expenseId} {
-      allow read, write: if request.auth != null;
-    }
-
-    match /direct_settlements/{settlementId} {
+    // Allow all authenticated friends and users to read and write data safely
+    match /{document=**} {
       allow read, write: if request.auth != null;
     }
   }

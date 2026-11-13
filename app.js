@@ -575,7 +575,7 @@
         </div>
         <div class="amt">
           <b>${rm(step.amount)}</b>
-          ${step.from === ME ? `<button class="btn sm" data-action="settle-person" data-id="${step.to}" style="margin-top:4px;">Pay</button>` : ''}
+          <button class="btn sm" data-action="settle-group-step" data-group="${g.id}" data-from="${step.from}" data-to="${step.to}" data-amount="${step.amount}" style="margin-top:4px;">${step.from === ME ? 'Pay' : 'Settle'}</button>
         </div>
       </div>
     `).join('') : emptyBlock('✅', 'No pending transfers', 'All balances in this group are settled.');
@@ -1473,65 +1473,154 @@
     `;
   }
 
-  async function openSettle(personId) {
-    const debt = pairBal(personId, ME);
-    const amountVal = (Math.max(0, debt) / 100).toFixed(2);
-    const from = personId;
-    const to = ME;
+  function openSettleSheet(personId, defaultGroupId = null, prefilledFrom = null, prefilledTo = null, prefilledAmount = null) {
+    const p = person(personId);
+    const bal = pairBal(ME, personId); // positive if person owes ME, negative if ME owes person
+    
+    // Determine default payer and payee
+    let defaultFrom = ME;
+    let defaultTo = personId;
+    let defaultAmtMinor = Math.abs(bal);
 
-    const numeric = toMinor(amountVal);
-    if (!numeric) {
-      toast('No outstanding balance to settle', true);
+    if (prefilledFrom && prefilledTo && prefilledAmount) {
+      defaultFrom = prefilledFrom;
+      defaultTo = prefilledTo;
+      defaultAmtMinor = prefilledAmount;
+    } else if (bal > 0) {
+      // Friend owes ME -> Friend pays ME
+      defaultFrom = personId;
+      defaultTo = ME;
+    } else {
+      // ME owes Friend (or 0) -> ME pays Friend
+      defaultFrom = ME;
+      defaultTo = personId;
+    }
+
+    const amtFormatted = (defaultAmtMinor / 100).toFixed(2);
+    
+    // Find relevant group if exists
+    const sharedGroup = defaultGroupId ? group(defaultGroupId) : state.groups.find(g => (g.members || []).includes(personId) && (g.members || []).includes(ME));
+    const targetGroupId = sharedGroup ? sharedGroup.id : null;
+
+    overlayEl.innerHTML = `
+      <div class="scrim" data-action="close-modal"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="fm-head">
+          <button class="txt" data-action="close-modal">Cancel</button>
+          <h2>Record Payment</h2>
+          <span></span>
+        </div>
+        <div style="padding:14px 0;">
+          <div class="field">
+            <label>Who paid whom?</label>
+            <div class="seg" style="display:flex;background:var(--bg);padding:4px;border-radius:12px;gap:4px;">
+              <button class="settle-toggle ${defaultFrom === ME ? 'on' : ''}" data-action="set-settle-payer" data-from="${ME}" data-to="${personId}">
+                You paid ${esc(p.name)}
+              </button>
+              <button class="settle-toggle ${defaultFrom === personId ? 'on' : ''}" data-action="set-settle-payer" data-from="${personId}" data-to="${ME}">
+                ${esc(p.name)} paid You
+              </button>
+            </div>
+          </div>
+
+          <input type="hidden" id="settle-from-val" value="${defaultFrom}" />
+          <input type="hidden" id="settle-to-val" value="${defaultTo}" />
+          <input type="hidden" id="settle-group-val" value="${targetGroupId || ''}" />
+          <input type="hidden" id="settle-person-val" value="${personId}" />
+
+          <div class="field amount-wrap" style="margin-top:14px;">
+            <label>Payment Amount (RM)</label>
+            <input class="input amt" id="settle-amount-val" value="${amtFormatted}" inputmode="decimal" placeholder="0.00" />
+          </div>
+
+          <div class="field" style="margin-top:14px;">
+            <label>Date</label>
+            <input class="input" id="settle-date-val" type="date" value="${todayISO()}" />
+          </div>
+
+          ${sharedGroup ? `
+            <div class="field" style="margin-top:14px;">
+              <label>Applied to Group</label>
+              <div class="chip on">${sharedGroup.emoji || '👥'} ${esc(sharedGroup.name)}</div>
+            </div>
+          ` : `
+            <div class="field" style="margin-top:14px;">
+              <label>Payment Type</label>
+              <span class="direct-chip">Direct Payment</span>
+            </div>
+          `}
+
+          <div style="margin-top:24px;">
+            <button class="btn" data-action="confirm-settle-payment">Record Payment</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function confirmSettlePayment() {
+    const from = document.getElementById('settle-from-val')?.value;
+    const to = document.getElementById('settle-to-val')?.value;
+    const amtStr = document.getElementById('settle-amount-val')?.value;
+    const date = document.getElementById('settle-date-val')?.value || todayISO();
+    const groupId = document.getElementById('settle-group-val')?.value || null;
+
+    const amount = toMinor(amtStr);
+    if (!amount || amount <= 0) {
+      toast('Please enter a valid payment amount', true);
       return;
     }
 
-    let remaining = numeric;
-    const alloc = state.groups
-      .map((item) => ({ groupId: item.id, amount: Math.max(0, pairBal(to, from, item.id)) }))
-      .filter((item) => item.amount > 0)
-      .sort((a, b) => b.amount - a.amount)
-      .map((item) => {
-        const allocated = Math.min(item.amount, remaining);
-        remaining -= allocated;
-        return { groupId: item.groupId, amount: allocated };
-      })
-      .filter((item) => item.amount > 0);
-
-    const targetGroupId = alloc[0]?.groupId || null;
+    const settleId = uid('settle');
+    const paymentDoc = {
+      id: settleId,
+      from,
+      to,
+      amount,
+      date,
+      groupId: groupId || null,
+      participants: [from, to],
+      createdAt: Date.now()
+    };
 
     if (isFirebaseConfigured && currentFirebaseUser && db) {
       try {
-        const settleId = uid('settle');
-        if (targetGroupId) {
-          await db.collection('groups').doc(targetGroupId).collection('settlements').doc(settleId).set({
-            id: settleId,
+        if (groupId) {
+          await db.collection('groups').doc(groupId).collection('settlements').doc(settleId).set(paymentDoc);
+          await db.collection('groups').doc(groupId).collection('activity').doc(uid('act')).set({
+            id: uid('act'),
+            type: 'payment',
+            ts: Date.now(),
+            actor: currentFirebaseUser.uid,
             from,
             to,
-            amount: numeric,
-            date: todayISO(),
-            groupId: targetGroupId,
-            alloc,
-            createdAt: Date.now()
+            amount,
+            groupId
           });
         } else {
-          // Direct 1-on-1 settlement
-          await db.collection('direct_settlements').doc(settleId).set({
-            id: settleId,
-            from,
-            to,
-            amount: numeric,
-            date: todayISO(),
-            participants: [from, to],
-            createdAt: Date.now()
-          });
+          await db.collection('direct_settlements').doc(settleId).set(paymentDoc);
         }
-        toast('Payment recorded');
+        closeModal();
+        toast('Payment recorded successfully!');
       } catch (err) {
+        console.error('Settle error:', err);
         toast(`Error: ${err.message}`, true);
       }
     } else {
-      state.settlements.push({ id: uid('settle'), from, to, amount: numeric, date: todayISO(), alloc, createdAt: Date.now() });
+      state.settlements.push(paymentDoc);
+      state.activity.push({
+        id: uid('act'),
+        type: 'payment',
+        ts: Date.now(),
+        actor: ME,
+        from,
+        to,
+        amount,
+        groupId: groupId || null
+      });
       saveState();
+      closeModal();
       toast('Payment recorded');
       render();
     }
@@ -1971,7 +2060,33 @@
     }
 
     if (action === 'settle-person') {
-      await openSettle(el.dataset.id);
+      openSettleSheet(el.dataset.id);
+      return;
+    }
+
+    if (action === 'settle-group-step') {
+      openSettleSheet(
+        el.dataset.from === ME ? el.dataset.to : el.dataset.from,
+        el.dataset.group,
+        el.dataset.from,
+        el.dataset.to,
+        Number(el.dataset.amount)
+      );
+      return;
+    }
+
+    if (action === 'set-settle-payer') {
+      const fromVal = el.dataset.from;
+      const toVal = el.dataset.to;
+      document.getElementById('settle-from-val').value = fromVal;
+      document.getElementById('settle-to-val').value = toVal;
+      document.querySelectorAll('.settle-toggle').forEach(btn => btn.classList.remove('on'));
+      el.classList.add('on');
+      return;
+    }
+
+    if (action === 'confirm-settle-payment') {
+      await confirmSettlePayment();
       return;
     }
   });
