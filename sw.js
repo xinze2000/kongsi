@@ -1,5 +1,5 @@
 // Kongsi service worker: network-first for HTML/JS/CSS with offline cache fallback.
-const CACHE = 'kongsi-shell-v7';
+const CACHE = 'kongsi-shell-v8';
 const SHELL = [
   './',
   './index.html',

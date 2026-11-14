@@ -801,20 +801,21 @@
 
   function minorInputValue(minor, currency) {
     const decimals = (CUR[currency] || CUR.MYR).dec;
-    return (minor / (10 ** decimals)).toFixed(decimals);
+    const val = Number(minor) || 0;
+    return (val / (10 ** decimals)).toFixed(decimals);
   }
 
   function prefillDraftSplit(method = draft?.method) {
     if (!draft || !draft.participants.length) return;
     const weights = Object.fromEntries(draft.participants.map((personId) => [personId, 1]));
-    if (method === 'exact' && draft.autoExact) {
+    if ((method === 'exact' || method === 'all') && draft.autoExact) {
       const amounts = distribute(toMinor(draft.amount, draft.currency), draft.participants, weights);
       draft.exact = Object.fromEntries(draft.participants.map((personId) => [
         personId,
         minorInputValue(amounts[personId] || 0, draft.currency)
       ]));
     }
-    if (method === 'percent' && draft.autoPercent) {
+    if ((method === 'percent' || method === 'all') && draft.autoPercent) {
       const percentages = distribute(10000, draft.participants, weights);
       draft.percent = Object.fromEntries(draft.participants.map((personId) => [
         personId,
@@ -831,41 +832,121 @@
       return distribute(total, participants, Object.fromEntries(participants.map((personId) => [personId, 1])));
     }
     if (draft.method === 'exact') {
-      return Object.fromEntries(participants.map((personId) => [personId, toMinor(draft.exact[personId], draft.currency)]));
+      return Object.fromEntries(participants.map((personId) => [personId, toMinor(draft.exact?.[personId] || 0, draft.currency)]));
     }
     return Object.fromEntries(participants.map((personId) => [
       personId,
-      Math.round(total * parseNum(draft.percent[personId]) / 100)
+      Math.round(total * parseNum(draft.percent?.[personId]) / 100)
     ]));
   }
 
-  function draftSplitPreviewHtml() {
+  function getDraftSplitSummaryData() {
     const shares = draftSplitShares();
     const participants = draft?.participants || [];
     const total = toMinor(draft?.amount, draft?.currency);
     const allocated = Object.values(shares).reduce((sum, value) => sum + value, 0);
-    const percentage = participants.reduce((sum, personId) => sum + parseNum(draft?.percent[personId]), 0);
-    const summary = draft?.method === 'exact'
-      ? `${money(allocated, draft.currency)} of ${money(total, draft.currency)} assigned`
-      : draft?.method === 'percent'
-        ? `${percentage}% assigned · ${money(allocated, draft.currency)}`
-        : `${money(total, draft.currency)} split equally`;
+    const percentage = participants.reduce((sum, personId) => sum + parseNum(draft?.percent?.[personId]), 0);
+
+    let summary = '';
+    let isOk = false;
+    if (draft?.method === 'exact') {
+      const diff = total - allocated;
+      summary = `${money(allocated, draft.currency)} of ${money(total, draft.currency)} assigned`;
+      if (diff > 0) summary += ` (${money(diff, draft.currency)} left)`;
+      else if (diff < 0) summary += ` (${money(Math.abs(diff), draft.currency)} over)`;
+      isOk = allocated === total;
+    } else if (draft?.method === 'percent') {
+      const pctDiff = 100 - percentage;
+      summary = `${percentage}% assigned · ${money(allocated, draft.currency)} of ${money(total, draft.currency)}`;
+      if (Math.abs(pctDiff) > 0.001) {
+        summary += pctDiff > 0 ? ` (${pctDiff.toFixed(pctDiff % 1 === 0 ? 0 : 1)}% left)` : ` (${Math.abs(pctDiff).toFixed(pctDiff % 1 === 0 ? 0 : 1)}% over)`;
+      }
+      isOk = Math.abs(100 - percentage) < 0.05;
+    } else {
+      summary = `${money(total, draft.currency)} split equally`;
+      isOk = true;
+    }
+    return { summary, isOk, shares, participants, total, allocated, percentage };
+  }
+
+  function draftSplitPreviewHtml() {
+    const { summary, isOk, shares, participants } = getDraftSplitSummaryData();
+    const curSym = CUR[draft?.currency || 'MYR']?.sym || 'RM';
 
     return `
-      ${participants.map((personId) => `
-        <div class="row split-preview-row">
-          ${avatar(personId, 'sm')}
-          <div class="grow"><div class="t">${esc(personId === ME ? 'You' : person(personId).name)}</div></div>
-          <div class="amt"><b>${money(shares[personId] || 0, draft.currency)}</b></div>
-        </div>
-      `).join('')}
-      <div class="split-preview-total ${allocated === total ? 'ok' : 'warn'}">${esc(summary)}</div>
+      ${participants.map((personId) => {
+        const pName = esc(personId === ME ? 'You' : person(personId).name);
+        if (draft.method === 'exact') {
+          return `
+            <div class="row split-preview-row">
+              ${avatar(personId, 'sm')}
+              <div class="grow"><div class="t">${pName}</div></div>
+              <div class="split-input-box">
+                <span class="unit cur-sym">${curSym}</span>
+                <input class="split-val-input" type="text" inputmode="decimal" data-field="exact" data-member="${personId}" value="${esc(draft.exact?.[personId] ?? '')}" placeholder="0.00" />
+              </div>
+            </div>
+          `;
+        }
+        if (draft.method === 'percent') {
+          return `
+            <div class="row split-preview-row">
+              ${avatar(personId, 'sm')}
+              <div class="grow">
+                <div class="t">${pName}</div>
+                <div class="s" data-share-for="${personId}">${money(shares[personId] || 0, draft.currency)}</div>
+              </div>
+              <div class="split-input-box">
+                <input class="split-val-input" type="text" inputmode="decimal" data-field="percent" data-member="${personId}" value="${esc(draft.percent?.[personId] ?? '')}" placeholder="0" />
+                <span class="unit">%</span>
+              </div>
+            </div>
+          `;
+        }
+        return `
+          <div class="row split-preview-row">
+            ${avatar(personId, 'sm')}
+            <div class="grow"><div class="t">${pName}</div></div>
+            <div class="amt"><b>${money(shares[personId] || 0, draft.currency)}</b></div>
+          </div>
+        `;
+      }).join('')}
+      <div class="split-preview-total ${isOk ? 'ok' : 'warn'}">${esc(summary)}</div>
     `;
   }
 
-  function updateDraftSplitPreview() {
+  function updateDraftSplitSummary() {
+    const totalEl = overlayEl.querySelector('.split-preview-total');
+    if (!totalEl || !draft) return;
+    const { summary, isOk } = getDraftSplitSummaryData();
+    totalEl.className = `split-preview-total ${isOk ? 'ok' : 'warn'}`;
+    totalEl.textContent = summary;
+  }
+
+  function updateDraftPercentShares() {
+    if (!draft) return;
+    const shares = draftSplitShares();
+    draft.participants.forEach((personId) => {
+      const shareEl = overlayEl.querySelector(`[data-share-for="${personId}"]`);
+      if (shareEl) shareEl.textContent = money(shares[personId] || 0, draft.currency);
+    });
+  }
+
+  function syncExactInputsFromDraft() {
+    if (!draft) return;
+    draft.participants.forEach((personId) => {
+      const inp = overlayEl.querySelector(`input[data-field="exact"][data-member="${personId}"]`);
+      if (inp) inp.value = draft.exact?.[personId] ?? '';
+    });
+  }
+
+  function renderDraftSplitPreview() {
     const preview = overlayEl.querySelector('[data-split-preview]');
     if (preview) preview.innerHTML = draftSplitPreviewHtml();
+  }
+
+  function updateDraftSplitPreview() {
+    renderDraftSplitPreview();
   }
 
   function makeExpenseFormHtml(animate = true) {
@@ -1019,7 +1100,7 @@
       toast('Exact amounts must add up to the total', true);
       return;
     }
-    if (draft.method === 'percent' && Math.abs(Object.values(percent).reduce((sum, value) => sum + value, 0) - 100) > 0.000001) {
+    if (draft.method === 'percent' && Math.abs(Object.values(percent).reduce((sum, value) => sum + value, 0) - 100) > 0.05) {
       toast('Percentages must add up to 100%', true);
       return;
     }
@@ -2032,8 +2113,17 @@
     }
 
     if (action === 'set-method') {
-      draft.method = el.dataset.method || 'equal';
-      prefillDraftSplit();
+      const newMethod = el.dataset.method || 'equal';
+      draft.method = newMethod;
+      if (newMethod === 'exact') {
+        const hasExact = Object.values(draft.exact || {}).some(v => parseNum(v) > 0);
+        if (!hasExact) draft.autoExact = true;
+        prefillDraftSplit('exact');
+      } else if (newMethod === 'percent') {
+        const hasPercent = Object.values(draft.percent || {}).some(v => parseNum(v) > 0);
+        if (!hasPercent) draft.autoPercent = true;
+        prefillDraftSplit('percent');
+      }
       openModal(false);
       return;
     }
@@ -2095,19 +2185,63 @@
     const field = input.dataset.field;
     if (!draft || !field) return;
 
-    if (field === 'desc') draft.desc = input.value;
-    else if (field === 'amount') draft.amount = input.value;
-    else if (field === 'currency') draft.currency = input.value;
-    else if (field === 'date') draft.date = input.value;
-    else if (field === 'exact') {
+    if (field === 'desc') {
+      draft.desc = input.value;
+      return;
+    }
+    if (field === 'date') {
+      draft.date = input.value;
+      return;
+    }
+    if (field === 'exact') {
+      if (!draft.exact) draft.exact = {};
       draft.exact[input.dataset.member] = input.value;
       draft.autoExact = false;
-    } else if (field === 'percent') {
+      updateDraftSplitSummary();
+      return;
+    }
+    if (field === 'percent') {
+      if (!draft.percent) draft.percent = {};
       draft.percent[input.dataset.member] = input.value;
       draft.autoPercent = false;
+      updateDraftPercentShares();
+      updateDraftSplitSummary();
+      return;
     }
-    if ((field === 'amount' || field === 'currency') && draft.method === 'exact') prefillDraftSplit('exact');
-    if (field === 'amount' || field === 'currency' || field === 'exact' || field === 'percent') updateDraftSplitPreview();
+    if (field === 'amount') {
+      draft.amount = input.value;
+      if (draft.method === 'exact') {
+        if (draft.autoExact) {
+          prefillDraftSplit('exact');
+          syncExactInputsFromDraft();
+        }
+        updateDraftSplitSummary();
+      } else if (draft.method === 'percent') {
+        updateDraftPercentShares();
+        updateDraftSplitSummary();
+      } else {
+        renderDraftSplitPreview();
+      }
+      return;
+    }
+    if (field === 'currency') {
+      draft.currency = input.value;
+      if (draft.method === 'exact') {
+        const curSym = CUR[draft.currency || 'MYR']?.sym || 'RM';
+        overlayEl.querySelectorAll('.split-input-box .unit.cur-sym').forEach(el => el.textContent = curSym);
+        if (draft.autoExact) {
+          prefillDraftSplit('exact');
+          syncExactInputsFromDraft();
+        }
+        updateDraftSplitSummary();
+      } else if (draft.method === 'percent') {
+        updateDraftPercentShares();
+        updateDraftSplitSummary();
+      } else {
+        renderDraftSplitPreview();
+      }
+      return;
+    }
   }
 
   document.addEventListener('input', (event) => updateDraftField(event.target));
